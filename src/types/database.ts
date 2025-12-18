@@ -326,6 +326,36 @@ export interface FaceVerificationResult {
     level?: number;
   };
 }
+// Add to your types/database.ts if not present:
+export interface FaceVerificationResult {
+  success: boolean;
+  match: boolean;
+  student?: Student;
+  confidence?: number;
+  matchScore?: number;
+  message: string;
+  timestamp: string;
+  image?: string;
+  sessionInfo?: {
+    totalStudents?: number;
+    courseCode?: string;
+    level?: number;
+  };
+}
+
+// Or create a simpler attendance result interface:
+export interface AttendanceResult {
+  success: boolean;
+  student?: {
+    id: string;
+    name: string;
+    matric_number: string;
+  };
+  confidence?: number;
+  message: string;
+  timestamp: string;
+  offline?: boolean;
+}
 
 // New interface for Enrollment Result
 export interface EnrollmentResult {

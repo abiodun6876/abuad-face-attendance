@@ -380,16 +380,11 @@ const AttendancePage: React.FC = () => {
           </>
         ) : (
           <div style={{ textAlign: 'center' }}>
-            <FaceCamera
-              mode="attendance"
-              sessionInfo={{
-                facultyId: selectedFaculty,
-                departmentId: selectedDepartment,
-                level: selectedLevel,
-                courseCode: courseCode
-              }}
-              onAttendanceComplete={handleFaceScanComplete}
-            />
+            
+<FaceCamera
+  mode="attendance"
+  onAttendanceComplete={handleFaceScanComplete}
+/>
 
             <div style={{ marginTop: 20 }}>
               <Button onClick={handleReset}>
