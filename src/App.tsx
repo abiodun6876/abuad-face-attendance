@@ -25,8 +25,10 @@ import {
 import EnrollmentPage from './pages/EnrollmentPage';
 import AttendancePage from './pages/AttendancePage';
 import Dashboard from './pages/Dashboard';
+import ImageManagementPage from './pages/ImageManagementPage';
 import SyncPage from './pages/SyncPage';
 import PWAInstallPrompt from './components/PWAInstallPrompt';
+
 import { supabase } from './lib/supabase';
 import './App.css';
 
@@ -592,68 +594,70 @@ npm start
                 ) : (
                   <>
                     <BackButton />
-                    <Routes>
-                      <Route path="/" element={<HomeCards />} />
-                      <Route path="/enroll" element={<EnrollmentPage />} />
-                      <Route path="/attendance" element={<AttendancePage />} />
-                      <Route path="/students" element={
-                        <div style={{ textAlign: 'center', padding: '40px 20px' }}>
-                          <Users size={48} style={{ opacity: 0.3, marginBottom: 20 }} />
-                          <Title level={4}>Student Management</Title>
-                          <Text type="secondary">Coming Soon - View and manage all enrolled students</Text>
-                          <div style={{ marginTop: 20 }}>
-                            <Button type="primary" onClick={() => window.location.href = '/enroll'}>
-                              Enroll New Students
-                            </Button>
-                          </div>
-                        </div>
-                      } />
-                      <Route path="/events" element={
-                        <div style={{ textAlign: 'center', padding: '40px 20px' }}>
-                          <Calendar size={48} style={{ opacity: 0.3, marginBottom: 20 }} />
-                          <Title level={4}>Event Management</Title>
-                          <Text type="secondary">Coming Soon - Schedule classes and events</Text>
-                          <div style={{ marginTop: 20 }}>
-                            <Button type="primary" onClick={() => window.location.href = '/attendance'}>
-                              Take Attendance Now
-                            </Button>
-                          </div>
-                        </div>
-                      } />
-                      <Route path="/sync" element={<SyncPage />} />
-                      <Route path="/settings" element={
-                        <div style={{ textAlign: 'center', padding: '40px 20px' }}>
-                          <Settings size={48} style={{ opacity: 0.3, marginBottom: 20 }} />
-                          <Title level={4}>System Settings</Title>
-                          <Text type="secondary">Coming Soon - Configure system preferences</Text>
-                        </div>
-                      } />
-                      <Route path="/import" element={
-                        <div style={{ textAlign: 'center', padding: '40px 20px' }}>
-                          <Upload size={48} style={{ opacity: 0.3, marginBottom: 20 }} />
-                          <Title level={4}>Import Students</Title>
-                          <Text type="secondary">Coming Soon - Bulk import student data from CSV</Text>
-                          <div style={{ marginTop: 20 }}>
-                            <Button type="primary" onClick={() => window.location.href = '/enroll'}>
-                              Enroll Single Student
-                            </Button>
-                          </div>
-                        </div>
-                      } />
-                      <Route path="/export" element={
-                        <div style={{ textAlign: 'center', padding: '40px 20px' }}>
-                          <Download size={48} style={{ opacity: 0.3, marginBottom: 20 }} />
-                          <Title level={4}>Export Reports</Title>
-                          <Text type="secondary">Coming Soon - Download attendance reports</Text>
-                          <div style={{ marginTop: 20 }}>
-                            <Button type="primary" onClick={() => window.location.href = '/attendance'}>
-                              View Attendance Records
-                            </Button>
-                          </div>
-                        </div>
-                      } />
-                      <Route path="*" element={<Navigate to="/" />} />
-                    </Routes>
+                    // In App.tsx, replace the Routes section:
+<Routes>
+  <Route path="/" element={<Dashboard />} /> {/* Changed from HomeCards to Dashboard */}
+  <Route path="/enroll" element={<EnrollmentPage />} />
+  <Route path="/attendance" element={<AttendancePage />} />
+  <Route path="/images" element={<ImageManagementPage />} />
+  <Route path="/students" element={
+    <div style={{ textAlign: 'center', padding: '40px 20px' }}>
+      <Users size={48} style={{ opacity: 0.3, marginBottom: 20 }} />
+      <Title level={4}>Student Management</Title>
+      <Text type="secondary">Coming Soon - View and manage all enrolled students</Text>
+      <div style={{ marginTop: 20 }}>
+        <Button type="primary" onClick={() => window.location.href = '/enroll'}>
+          Enroll New Students
+        </Button>
+      </div>
+    </div>
+  } />
+  <Route path="/events" element={
+    <div style={{ textAlign: 'center', padding: '40px 20px' }}>
+      <Calendar size={48} style={{ opacity: 0.3, marginBottom: 20 }} />
+      <Title level={4}>Event Management</Title>
+      <Text type="secondary">Coming Soon - Schedule classes and events</Text>
+      <div style={{ marginTop: 20 }}>
+        <Button type="primary" onClick={() => window.location.href = '/attendance'}>
+          Take Attendance Now
+        </Button>
+      </div>
+    </div>
+  } />
+  <Route path="/sync" element={<SyncPage />} />
+  <Route path="/settings" element={
+    <div style={{ textAlign: 'center', padding: '40px 20px' }}>
+      <Settings size={48} style={{ opacity: 0.3, marginBottom: 20 }} />
+      <Title level={4}>System Settings</Title>
+      <Text type="secondary">Coming Soon - Configure system preferences</Text>
+    </div>
+  } />
+  <Route path="/import" element={
+    <div style={{ textAlign: 'center', padding: '40px 20px' }}>
+      <Upload size={48} style={{ opacity: 0.3, marginBottom: 20 }} />
+      <Title level={4}>Import Students</Title>
+      <Text type="secondary">Coming Soon - Bulk import student data from CSV</Text>
+      <div style={{ marginTop: 20 }}>
+        <Button type="primary" onClick={() => window.location.href = '/enroll'}>
+          Enroll Single Student
+        </Button>
+      </div>
+    </div>
+  } />
+  <Route path="/export" element={
+    <div style={{ textAlign: 'center', padding: '40px 20px' }}>
+      <Download size={48} style={{ opacity: 0.3, marginBottom: 20 }} />
+      <Title level={4}>Export Reports</Title>
+      <Text type="secondary">Coming Soon - Download attendance reports</Text>
+      <div style={{ marginTop: 20 }}>
+        <Button type="primary" onClick={() => window.location.href = '/attendance'}>
+          View Attendance Records
+        </Button>
+      </div>
+    </div>
+  } />
+  <Route path="*" element={<Navigate to="/" />} />
+</Routes>
                     {/* PWA Install Prompt shows when logged in */}
                     <PWAInstallPrompt />
                   </>
