@@ -162,6 +162,27 @@
     padding-bottom: 4px;
   }
   
+  /* PWA Install Button Fix */
+.ant-btn-primary {
+  background-color: #1890ff !important;
+  border-color: #1890ff !important;
+}
+
+.ant-btn-primary:hover {
+  background-color: #40a9ff !important;
+  border-color: #40a9ff !important;
+}
+
+/* Ensure modal buttons are visible */
+.ant-modal .ant-btn-primary {
+  background-color: #1890ff !important;
+}
+
+/* Fix for any white button issues */
+button[type="primary"] {
+  background-color: #1890ff !important;
+  color: white !important;
+}
   /* Grid adjustments */
   .ant-row {
     margin-left: -8px !important;
