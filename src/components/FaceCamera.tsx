@@ -1,23 +1,20 @@
-// src/components/FaceCamera.tsx - UPDATED VERSION
+// src/components/FaceCamera.tsx - SIMPLIFIED VERSION
 import React, { useState } from 'react';
 import { Card, Button, Alert, Typography, Space, Progress } from 'antd';
 import { Camera, RefreshCw, CheckCircle, User } from 'lucide-react';
-import { EnrollmentResult } from '../types/database';
 
 const { Title, Text } = Typography;
 
 interface FaceCameraProps {
   mode: 'enrollment' | 'attendance';
   student?: any;
-  sessionInfo?: any; // Add this prop
-  onEnrollmentComplete?: (result: EnrollmentResult) => void;
-  onAttendanceComplete?: (result: any) => void; // Add this prop
+  onEnrollmentComplete?: (result: any) => void;
+  onAttendanceComplete?: (result: any) => void;
 }
 
 const FaceCamera: React.FC<FaceCameraProps> = ({
   mode,
   student,
-  sessionInfo,
   onEnrollmentComplete,
   onAttendanceComplete
 }) => {
@@ -35,14 +32,13 @@ const FaceCamera: React.FC<FaceCameraProps> = ({
           clearInterval(interval);
           
           if (mode === 'enrollment') {
-            // Create success result for enrollment
-            const result: EnrollmentResult = {
+            const result = {
               success: true,
               studentId: student?.id || `student_${Date.now()}`,
               studentName: student?.name || 'Unknown Student',
               embedding: Array.from({ length: 128 }, () => Math.random()),
               quality: 0.85 + Math.random() * 0.1,
-              photoUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${student?.name || 'student'}`,
+              photoUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${student?.matric_number || 'student'}`,
               timestamp: new Date().toISOString(),
               message: 'Face captured successfully!'
             };
@@ -52,8 +48,7 @@ const FaceCamera: React.FC<FaceCameraProps> = ({
               onEnrollmentComplete?.(result);
             }, 500);
           } else {
-            // Create success result for attendance
-            const attendanceResult = {
+            const result = {
               success: true,
               student: {
                 id: `student_${Math.floor(Math.random() * 1000)}`,
@@ -67,7 +62,7 @@ const FaceCamera: React.FC<FaceCameraProps> = ({
             
             setTimeout(() => {
               setIsCapturing(false);
-              onAttendanceComplete?.(attendanceResult);
+              onAttendanceComplete?.(result);
             }, 500);
           }
           
@@ -94,16 +89,6 @@ const FaceCamera: React.FC<FaceCameraProps> = ({
           style={{ marginBottom: 20 }}
         />
       )}
-      
-      {mode === 'attendance' && sessionInfo && (
-        <Alert
-          message="Taking Attendance"
-          description={`Course: ${sessionInfo.courseCode || 'N/A'} | Level: ${sessionInfo.level || 'N/A'}`}
-          type="info"
-          showIcon
-          style={{ marginBottom: 20 }}
-        />
-      )}
 
       <div style={{ textAlign: 'center' }}>
         {isCapturing ? (
@@ -124,12 +109,8 @@ const FaceCamera: React.FC<FaceCameraProps> = ({
             
             <Text style={{ display: 'block', marginBottom: 20 }}>
               {progress < 100 
-                ? mode === 'enrollment' 
-                  ? 'Capturing face... Please look at the camera' 
-                  : 'Scanning face... Please look at the camera'
-                : mode === 'enrollment'
-                  ? 'Face captured successfully!'
-                  : 'Attendance recorded successfully!'
+                ? 'Capturing face... Please look at the camera' 
+                : 'Face captured successfully!'
               }
             </Text>
             
@@ -138,11 +119,7 @@ const FaceCamera: React.FC<FaceCameraProps> = ({
             {progress >= 100 && (
               <Alert
                 message="Success!"
-                description={
-                  mode === 'enrollment' 
-                    ? "Face data has been captured and processed"
-                    : "Attendance has been recorded successfully"
-                }
+                description="Face data has been captured and processed"
                 type="success"
                 showIcon
                 style={{ marginTop: 20 }}
@@ -165,16 +142,13 @@ const FaceCamera: React.FC<FaceCameraProps> = ({
             </div>
             
             <Alert
-              message={mode === 'enrollment' ? 'Face Capture Instructions' : 'Attendance Instructions'}
+              message="Face Capture Instructions"
               description={
                 <div style={{ textAlign: 'left', marginTop: 10 }}>
                   <p>1. Ensure good lighting on your face</p>
                   <p>2. Look directly at the camera</p>
                   <p>3. Keep a neutral expression</p>
                   <p>4. Remove glasses if possible</p>
-                  {mode === 'attendance' && (
-                    <p>5. Wait for the scan to complete</p>
-                  )}
                 </div>
               }
               type="info"
@@ -208,10 +182,7 @@ const FaceCamera: React.FC<FaceCameraProps> = ({
         <Text type="secondary">
           <small>
             <CheckCircle size={12} style={{ marginRight: 5 }} />
-            {mode === 'enrollment' 
-              ? 'Your face data is encrypted and stored securely'
-              : 'Attendance is recorded in real-time and synced to database'
-            }
+            Your face data is encrypted and stored securely
           </small>
         </Text>
       </div>

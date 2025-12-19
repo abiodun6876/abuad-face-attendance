@@ -1,5 +1,5 @@
-// src/pages/EnrollmentPage.tsx - COMPLETELY FIXED VERSION
-import React, { useState, useEffect, useCallback } from 'react';
+// src/pages/EnrollmentPage.tsx - UPDATED FOR ACTUAL DATABASE
+import React, { useState } from 'react';
 import { 
   Card, 
   Form, 
@@ -13,165 +13,23 @@ import {
   Row,
   Col,
   Steps,
-  DatePicker,
   Spin,
   Tag
 } from 'antd';
-import { Camera, User, BookOpen, CheckCircle, Mail, Phone, GraduationCap, Building, Calendar, Book, Layers, Clock, Circle } from 'lucide-react';
+import { Camera, User, BookOpen, CheckCircle, Mail, Phone, GraduationCap } from 'lucide-react';
 import FaceCamera from '../components/FaceCamera';
 import { supabase } from '../lib/supabase';
-import { Student, Faculty, Department, Level, Program, AcademicSession, Semester, EnrollmentResult } from '../types/database';
-import dayjs from 'dayjs';
 
 const { Title, Text } = Typography;
 
-interface EnrollmentFormData {
-  name: string;
-  email?: string;
-  phone?: string;
-  gender?: string;
-  date_of_birth?: string;
-  faculty_id?: string;
-  department_id?: string;
-  program_id?: string;
-  current_level_id?: string;
-  current_semester_id?: string;
-  academic_session_id?: string;
-  admission_year?: string;
-  matric_number?: string;
-  year_of_entry?: string;
-}
-
 const EnrollmentPage: React.FC = () => {
   const [currentStep, setCurrentStep] = useState(0);
-  const [studentData, setStudentData] = useState<Partial<EnrollmentFormData>>({});
-  const [faculties, setFaculties] = useState<Faculty[]>([]);
-  const [departments, setDepartments] = useState<Department[]>([]);
-  const [programs, setPrograms] = useState<Program[]>([]);
-  const [levels, setLevels] = useState<Level[]>([]);
-  const [sessions, setSessions] = useState<AcademicSession[]>([]);
-  const [semesters, setSemesters] = useState<Semester[]>([]);
+  const [studentData, setStudentData] = useState<any>({});
   const [loading, setLoading] = useState(false);
-  const [selectedFaculty, setSelectedFaculty] = useState<string>('');
   const [form] = Form.useForm();
   const [enrollmentComplete, setEnrollmentComplete] = useState(false);
-  const [enrollmentResult, setEnrollmentResult] = useState<EnrollmentResult | null>(null);
+  const [enrollmentResult, setEnrollmentResult] = useState<any>(null);
   const [isCameraActive, setIsCameraActive] = useState(false);
-
-  const fetchAcademicData = useCallback(async () => {
-    try {
-      setLoading(true);
-      
-      console.log('Fetching academic data...');
-      
-      // Fetch all academic data in parallel
-      const [
-        facultiesRes,
-        levelsRes,
-        sessionsRes,
-        programsRes,
-        semestersRes
-      ] = await Promise.all([
-        supabase.from('faculties').select('*').eq('is_active', true).order('name'),
-        supabase.from('levels').select('*').eq('is_active', true).order('level_order'),
-        supabase.from('academic_sessions').select('*').eq('is_active', true).order('start_date', { ascending: false }),
-        supabase.from('programs').select('*').eq('is_active', true).order('name'),
-        supabase.from('semesters').select('*').eq('is_active', true).order('semester_number')
-      ]);
-
-      console.log('Faculties:', facultiesRes.data?.length);
-      console.log('Levels:', levelsRes.data?.length);
-      console.log('Sessions:', sessionsRes.data?.length);
-      console.log('Programs:', programsRes.data?.length);
-      console.log('Semesters:', semestersRes.data?.length);
-
-      if (!facultiesRes.error) setFaculties(facultiesRes.data || []);
-      if (!levelsRes.error) setLevels(levelsRes.data || []);
-      if (!sessionsRes.error) setSessions(sessionsRes.data || []);
-      if (!programsRes.error) setPrograms(programsRes.data || []);
-      if (!semestersRes.error) setSemesters(semestersRes.data || []);
-
-      // If no programs exist, create default ones
-      if (programsRes.data?.length === 0) {
-        console.log('Creating default programs...');
-        await createDefaultPrograms();
-        // Re-fetch programs
-        const { data: newPrograms } = await supabase
-          .from('programs')
-          .select('*')
-          .eq('is_active', true)
-          .order('name');
-        setPrograms(newPrograms || []);
-      }
-
-    } catch (error) {
-      console.error('Error fetching academic data:', error);
-      message.error('Failed to load academic data');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  const createDefaultPrograms = async () => {
-    try {
-      const defaultPrograms = [
-        {
-          code: 'BSC-CS',
-          name: 'Bachelor of Science in Computer Science',
-          short_name: 'B.Sc CS',
-          program_type: 'UNDERGRADUATE' as const,
-          duration_years: 4,
-          is_active: true
-        },
-        {
-          code: 'BSC-EE',
-          name: 'Bachelor of Science in Electrical Engineering',
-          short_name: 'B.Sc EE',
-          program_type: 'UNDERGRADUATE' as const,
-          duration_years: 5,
-          is_active: true
-        }
-      ];
-
-      const { error } = await supabase.from('programs').insert(defaultPrograms);
-      if (error) console.error('Error creating default programs:', error);
-    } catch (error) {
-      console.error('Error creating default programs:', error);
-    }
-  };
-
-  useEffect(() => {
-    fetchAcademicData();
-  }, [fetchAcademicData]);
-
-  const fetchDepartments = async (facultyId: string) => {
-    try {
-      console.log('Fetching departments for faculty:', facultyId);
-      const { data, error } = await supabase
-        .from('departments')
-        .select('*')
-        .eq('faculty_id', facultyId)
-        .eq('is_active', true)
-        .order('name');
-
-      if (!error) {
-        console.log('Departments fetched:', data?.length);
-        setDepartments(data || []);
-      } else {
-        console.error('Error fetching departments:', error);
-      }
-    } catch (error) {
-      console.error('Error fetching departments:', error);
-    }
-  };
-
-  const handleFacultyChange = (value: string) => {
-    console.log('Faculty changed to:', value);
-    setSelectedFaculty(value);
-    fetchDepartments(value);
-    form.setFieldValue('department_id', undefined);
-    form.setFieldValue('program_id', undefined);
-  };
 
   const generateMatricNumber = () => {
     const currentYear = new Date().getFullYear().toString().slice(-2);
@@ -181,52 +39,27 @@ const EnrollmentPage: React.FC = () => {
 
   const handleNext = async () => {
     try {
-      console.log('Current step:', currentStep);
-      
       if (currentStep === 0) {
-        // Validate personal information fields
-        await form.validateFields(['name', 'email', 'year_of_entry']);
+        await form.validateFields(['name', 'matric_number']);
         const values = form.getFieldsValue();
         
-        console.log('Form values:', values);
-        
-        // Generate matric number if not provided
         if (!values.matric_number) {
           values.matric_number = generateMatricNumber();
           form.setFieldValue('matric_number', values.matric_number);
         }
 
         setStudentData(values);
-        console.log('Moving to step 1 with student data:', values);
         setCurrentStep(1);
       } else if (currentStep === 1) {
-        // Validate academic fields
-        await form.validateFields([
-          'faculty_id', 
-          'department_id', 
-          'program_id', 
-          'current_level_id', 
-          'academic_session_id',
-          'current_semester_id',
-          'admission_year'
-        ]);
-        
-        // Get all form values
-        const allValues = form.getFieldsValue();
-        setStudentData(prev => ({ ...prev, ...allValues }));
-        
-        console.log('Moving to step 2 with complete student data:', allValues);
         setCurrentStep(2);
       }
     } catch (error: any) {
       console.error('Form validation failed:', error);
-      
-      // Show specific error messages
       if (error.errorFields) {
         const errorMessages = error.errorFields.map((field: any) => field.errors[0]).join(', ');
-        message.error(`Please fix the following: ${errorMessages}`);
+        message.error(`Please fix: ${errorMessages}`);
       } else {
-        message.error('Please fill all required fields correctly');
+        message.error('Please fill all required fields');
       }
     }
   };
@@ -235,53 +68,35 @@ const EnrollmentPage: React.FC = () => {
     setCurrentStep(currentStep - 1);
   };
 
-  const handleEnrollmentComplete = async (result: EnrollmentResult) => {
-    console.log('Enrollment complete result:', result);
+  const handleEnrollmentComplete = async (result: any) => {
+    console.log('Face capture result:', result);
     
     if (result.success) {
       try {
-        // Get all form values
+        setLoading(true);
         const formValues = form.getFieldsValue();
-        console.log('Form values for saving:', formValues);
         
-        const selectedProgram = programs.find(p => p.id === formValues.program_id);
-        const selectedLevel = levels.find(l => l.id === formValues.current_level_id);
-        const selectedSession = sessions.find(s => s.id === formValues.academic_session_id);
-        const selectedSemester = semesters.find(s => s.id === formValues.current_semester_id);
-
-        // Prepare student data according to your schema
-        const studentRecord: Partial<Student> = {
+        // Prepare student data for database - using correct column names
+        const studentRecord = {
+          student_id: formValues.matric_number, // This is what your database expects
           name: formValues.name,
-          email: formValues.email,
-          phone: formValues.phone,
-          gender: formValues.gender,
-          date_of_birth: formValues.date_of_birth ? dayjs(formValues.date_of_birth).format('YYYY-MM-DD') : undefined,
-          faculty_id: formValues.faculty_id,
-          department_id: formValues.department_id,
-          program_id: formValues.program_id,
-          current_level_id: formValues.current_level_id,
-          current_semester_id: formValues.current_semester_id,
-          academic_session_id: formValues.academic_session_id,
-          admission_year: formValues.admission_year,
-          year_of_entry: formValues.year_of_entry,
-          matric_number: formValues.matric_number,
-          program_name: selectedProgram?.name,
-          level_code: selectedLevel?.code,
-          session_year: selectedSession?.session_year,
-          semester_number: selectedSemester?.semester_number,
-          enrollment_status: 'enrolled' as const,
+          email: formValues.email || null,
+          phone: formValues.phone || null,
+          gender: formValues.gender || null,
+          matric_number: formValues.matric_number, // Also store in new column
+          enrollment_status: 'enrolled',
           face_enrolled_at: new Date().toISOString(),
-          face_embedding: result.embedding,
-          photo_url: result.photoUrl,
-          face_match_threshold: 0.7, // Default threshold
+          face_embedding: result.embedding || [],
+          photo_url: result.photoUrl || '',
+          face_match_threshold: 0.7,
           is_active: true,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         };
 
-        console.log('Saving student record:', studentRecord);
+        console.log('Saving student:', studentRecord);
 
-        // Insert student record
+        // Save to database
         const { data: student, error: studentError } = await supabase
           .from('students')
           .insert([studentRecord])
@@ -289,101 +104,112 @@ const EnrollmentPage: React.FC = () => {
           .single();
 
         if (studentError) {
-          console.error('Student insert error:', studentError);
-          throw new Error(`Student insert failed: ${studentError.message}`);
-        }
-
-        console.log('Student saved:', student);
-
-        // Also create face enrollment record
-        if (result.embedding && student) {
-          const faceEnrollmentRecord = {
-            student_id: student.id,
-            embedding: result.embedding,
-            photo_url: result.photoUrl || '',
-            quality_score: result.quality || 0.8,
-            enrolled_at: new Date().toISOString(),
-            is_active: true,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          };
-
-          const { error: faceError } = await supabase
-            .from('face_enrollments')
-            .insert([faceEnrollmentRecord]);
-
-          if (faceError) {
-            console.error('Face enrollment record failed:', faceError);
-            // Continue anyway since student is created
+          console.error('Database error:', studentError);
+          
+          // Try without student_id if it fails
+          if (studentError.message.includes('student_id')) {
+            const studentRecordAlt = {
+              name: formValues.name,
+              email: formValues.email || null,
+              phone: formValues.phone || null,
+              gender: formValues.gender || null,
+              matric_number: formValues.matric_number,
+              enrollment_status: 'enrolled',
+              face_enrolled_at: new Date().toISOString(),
+              face_embedding: result.embedding || [],
+              photo_url: result.photoUrl || '',
+              face_match_threshold: 0.7,
+              is_active: true,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            };
+            
+            const { data: student2, error: studentError2 } = await supabase
+              .from('students')
+              .insert([studentRecordAlt])
+              .select()
+              .single();
+              
+            if (studentError2) {
+              throw new Error(`Database error: ${studentError2.message}`);
+            }
+            
+            // Save face enrollment
+            if (student2) {
+              await saveFaceEnrollment(student2.id, result);
+            }
+            
+            setEnrollmentResult(result);
+            setEnrollmentComplete(true);
+            message.success('Student enrolled successfully!');
+            return;
           }
+          
+          throw new Error(`Database error: ${studentError.message}`);
         }
 
-        // Create academic history
+        console.log('Student saved successfully:', student);
+
+        // Save face enrollment
         if (student) {
-          const academicHistory = {
-            student_id: student.id,
-            academic_session_id: formValues.academic_session_id,
-            level_id: formValues.current_level_id,
-            semester_id: formValues.current_semester_id,
-            program_id: formValues.program_id,
-            status: 'ACTIVE' as const,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          };
-
-          const { error: historyError } = await supabase
-            .from('student_academic_history')
-            .insert([academicHistory]);
-
-          if (historyError) {
-            console.error('Academic history failed:', historyError);
-          }
+          await saveFaceEnrollment(student.id, result);
         }
 
         setEnrollmentResult(result);
         setEnrollmentComplete(true);
-        message.success('Student enrollment completed successfully!');
+        message.success('Student enrolled successfully!');
 
       } catch (error: any) {
         console.error('Enrollment error:', error);
-        message.error(`Failed to save student record: ${error.message || 'Unknown error'}`);
+        message.error(`Failed to save student: ${error.message || 'Unknown error'}`);
         
-        // Show result with error
         setEnrollmentResult({
           success: false,
-          message: error.message || 'Failed to save student data',
-          timestamp: new Date().toISOString()
+          message: error.message || 'Failed to save student data'
         });
+      } finally {
+        setLoading(false);
       }
     } else {
-      console.error('Face enrollment failed:', result.message);
-      message.error(`Face enrollment failed: ${result.message}`);
+      message.error(`Face capture failed: ${result.message}`);
       setEnrollmentResult(result);
     }
   };
 
-  const getAvailableSemesters = () => {
-    const selectedSessionId = form.getFieldValue('academic_session_id');
-    
-    if (selectedSessionId) {
-      return semesters.filter(s => 
-        s.academic_session_id === null || 
-        s.academic_session_id === selectedSessionId
-      );
+  const saveFaceEnrollment = async (studentId: string, result: any) => {
+    try {
+      const faceEnrollmentRecord = {
+        student_id: studentId,
+        embedding: result.embedding || [],
+        photo_url: result.photoUrl || '',
+        quality_score: result.quality || 0.8,
+        enrolled_at: new Date().toISOString(),
+        is_active: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+
+      const { error: faceError } = await supabase
+        .from('face_enrollments')
+        .insert([faceEnrollmentRecord]);
+
+      if (faceError) {
+        console.error('Face enrollment save error:', faceError);
+      }
+    } catch (error) {
+      console.error('Error saving face enrollment:', error);
     }
-    
-    return semesters;
   };
 
   const stepItems = [
     {
-      title: 'Personal Information',
+      title: 'Basic Information',
       icon: <User />,
       content: (
         <div>
           <Alert
-            message="Personal Details"
-            description="Fill in the student's basic information"
+            message="Student Information"
+            description="Fill in the student's basic details"
             type="info"
             showIcon
             style={{ marginBottom: 20 }}
@@ -392,17 +218,15 @@ const EnrollmentPage: React.FC = () => {
           <Form
             form={form}
             layout="vertical"
-            style={{ maxWidth: 800, margin: '0 auto' }}
+            style={{ maxWidth: 600, margin: '0 auto' }}
             initialValues={{
-              gender: 'male',
-              admission_year: new Date().getFullYear().toString(),
-              year_of_entry: new Date().getFullYear().toString()
+              gender: 'male'
             }}
           >
             <Row gutter={[16, 16]}>
-              <Col xs={24} md={12}>
+              <Col span={24}>
                 <Form.Item
-                  label="Full Name"
+                  label="Full Name *"
                   name="name"
                   rules={[{ required: true, message: 'Please enter student name' }]}
                 >
@@ -412,9 +236,12 @@ const EnrollmentPage: React.FC = () => {
                   />
                 </Form.Item>
               </Col>
-              <Col xs={24} md={12}>
+            </Row>
+
+            <Row gutter={[16, 16]}>
+              <Col span={24}>
                 <Form.Item
-                  label="Matriculation Number"
+                  label="Matriculation Number *"
                   name="matric_number"
                   rules={[{ required: true, message: 'Please enter matric number' }]}
                 >
@@ -428,12 +255,11 @@ const EnrollmentPage: React.FC = () => {
             </Row>
 
             <Row gutter={[16, 16]}>
-              <Col xs={24} md={12}>
+              <Col span={24} md={12}>
                 <Form.Item
                   label="Email"
                   name="email"
                   rules={[
-                    { required: true, message: 'Please enter email' },
                     { type: 'email', message: 'Please enter valid email' }
                   ]}
                 >
@@ -444,13 +270,10 @@ const EnrollmentPage: React.FC = () => {
                   />
                 </Form.Item>
               </Col>
-              <Col xs={24} md={12}>
+              <Col span={24} md={12}>
                 <Form.Item
                   label="Phone Number"
                   name="phone"
-                  rules={[
-                    { pattern: /^[+]?[\d\s-]+$/, message: 'Please enter valid phone number' }
-                  ]}
                 >
                   <Input 
                     placeholder="+234 800 000 0000" 
@@ -462,38 +285,12 @@ const EnrollmentPage: React.FC = () => {
             </Row>
 
             <Row gutter={[16, 16]}>
-              <Col xs={24} md={8}>
+              <Col span={24}>
                 <Form.Item label="Gender" name="gender">
                   <Select placeholder="Select gender" size="large">
                     <Select.Option value="male">Male</Select.Option>
                     <Select.Option value="female">Female</Select.Option>
                   </Select>
-                </Form.Item>
-              </Col>
-              <Col xs={24} md={8}>
-                <Form.Item label="Date of Birth" name="date_of_birth">
-                  <DatePicker 
-                    style={{ width: '100%' }}
-                    placeholder="Select date of birth"
-                    disabledDate={(current) => current && current > dayjs().endOf('day')}
-                    size="large"
-                  />
-                </Form.Item>
-              </Col>
-              <Col xs={24} md={8}>
-                <Form.Item
-                  label="Year of Entry"
-                  name="year_of_entry"
-                  rules={[{ required: true, message: 'Please enter year of entry' }]}
-                >
-                  <Input 
-                    placeholder="e.g., 2024" 
-                    type="number"
-                    min="2000"
-                    max={new Date().getFullYear()}
-                    prefix={<Calendar size={16} />}
-                    size="large"
-                  />
                 </Form.Item>
               </Col>
             </Row>
@@ -504,170 +301,21 @@ const EnrollmentPage: React.FC = () => {
     {
       title: 'Academic Details',
       icon: <BookOpen />,
-      content: loading ? (
-        <div style={{ textAlign: 'center', padding: '40px' }}>
-          <Spin size="large" />
-          <Text style={{ display: 'block', marginTop: 20 }}>Loading academic data...</Text>
-        </div>
-      ) : (
-        <div>
+      content: (
+        <div style={{ textAlign: 'center', padding: '40px 20px' }}>
           <Alert
             message="Academic Information"
-            description="Select the student's academic program and details"
+            description="Academic details can be added later. For now, let's capture the student's face."
             type="info"
             showIcon
-            style={{ marginBottom: 20 }}
+            style={{ maxWidth: 600, margin: '0 auto' }}
           />
           
-          {programs.length === 0 && (
-            <Alert
-              message="No Programs Found"
-              description="Default programs are being created..."
-              type="warning"
-              showIcon
-              style={{ marginBottom: 20 }}
-            />
-          )}
-
-          <Form layout="vertical" style={{ maxWidth: 800, margin: '0 auto' }}>
-            <Row gutter={[16, 16]}>
-              <Col xs={24} md={12}>
-                <Form.Item
-                  label="Faculty"
-                  name="faculty_id"
-                  rules={[{ required: true, message: 'Please select faculty' }]}
-                >
-                  <Select
-                    placeholder="Select faculty"
-                    onChange={handleFacultyChange}
-                    loading={loading}
-                    options={faculties.map(f => ({
-                      label: f.name,
-                      value: f.id,
-                    }))}
-                    suffixIcon={<Building size={16} />}
-                    size="large"
-                  />
-                </Form.Item>
-              </Col>
-              <Col xs={24} md={12}>
-                <Form.Item
-                  label="Department"
-                  name="department_id"
-                  rules={[{ required: true, message: 'Please select department' }]}
-                >
-                  <Select
-                    placeholder="Select department"
-                    disabled={!selectedFaculty}
-                    loading={loading}
-                    options={departments.map(d => ({
-                      label: d.name,
-                      value: d.id,
-                    }))}
-                    size="large"
-                  />
-                </Form.Item>
-              </Col>
-            </Row>
-
-            <Row gutter={[16, 16]}>
-              <Col xs={24} md={12}>
-                <Form.Item
-                  label="Program"
-                  name="program_id"
-                  rules={[{ required: true, message: 'Please select program' }]}
-                >
-                  <Select
-                    placeholder="Select program"
-                    loading={loading}
-                    options={programs.map(p => ({
-                      label: p.name,
-                      value: p.id,
-                    }))}
-                    suffixIcon={<Book size={16} />}
-                    size="large"
-                  />
-                </Form.Item>
-              </Col>
-              <Col xs={24} md={12}>
-                <Form.Item
-                  label="Level"
-                  name="current_level_id"
-                  rules={[{ required: true, message: 'Please select level' }]}
-                >
-                  <Select
-                    placeholder="Select level"
-                    loading={loading}
-                    options={levels.map(l => ({
-                      label: `${l.code} - ${l.name}`,
-                      value: l.id,
-                    }))}
-                    suffixIcon={<Layers size={16} />}
-                    size="large"
-                  />
-                </Form.Item>
-              </Col>
-            </Row>
-
-            <Row gutter={[16, 16]}>
-              <Col xs={24} md={12}>
-                <Form.Item
-                  label="Academic Session"
-                  name="academic_session_id"
-                  rules={[{ required: true, message: 'Please select academic session' }]}
-                >
-                  <Select
-                    placeholder="Select academic session"
-                    loading={loading}
-                    options={sessions.map(s => ({
-                      label: s.session_year,
-                      value: s.id,
-                    }))}
-                    suffixIcon={<Calendar size={16} />}
-                    size="large"
-                  />
-                </Form.Item>
-              </Col>
-              <Col xs={24} md={12}>
-                <Form.Item
-                  label="Current Semester"
-                  name="current_semester_id"
-                  rules={[{ required: true, message: 'Please select semester' }]}
-                >
-                  <Select
-                    placeholder="Select semester"
-                    loading={loading}
-                    options={getAvailableSemesters().map(s => ({
-                      label: s.name,
-                      value: s.id,
-                      disabled: !s.is_current
-                    }))}
-                    suffixIcon={<Clock size={16} />}
-                    size="large"
-                  />
-                </Form.Item>
-              </Col>
-            </Row>
-
-            <Row gutter={[16, 16]}>
-              <Col xs={24}>
-                <Form.Item
-                  label="Admission Year"
-                  name="admission_year"
-                  rules={[{ required: true, message: 'Please enter admission year' }]}
-                >
-                  <Input 
-                    placeholder="e.g., 2024" 
-                    type="number"
-                    min="2000"
-                    max={new Date().getFullYear()}
-                    prefix={<Calendar size={16} />}
-                    size="large"
-                  />
-                </Form.Item>
-              </Col>
-            </Row>
-          </Form>
+          <div style={{ marginTop: 30 }}>
+            <Text type="secondary">
+              You can update academic information later from the student management page.
+            </Text>
+          </div>
         </div>
       ),
     },
@@ -688,14 +336,16 @@ const EnrollmentPage: React.FC = () => {
                 <p><strong>Matric Number:</strong> 
                   <Tag color="blue" style={{ marginLeft: 8 }}>{studentData.matric_number}</Tag>
                 </p>
-                <p><strong>Program:</strong> {programs.find(p => p.id === studentData.program_id)?.name}</p>
-                <p><strong>Level:</strong> {levels.find(l => l.id === studentData.current_level_id)?.name}</p>
-                <p><strong>Academic Session:</strong> {sessions.find(s => s.id === studentData.academic_session_id)?.session_year}</p>
+                {studentData.email && (
+                  <p><strong>Email:</strong> {studentData.email}</p>
+                )}
+                <p><strong>Status:</strong> <Tag color="success">Enrolled</Tag></p>
+                <p><strong>Enrollment Date:</strong> {new Date().toLocaleDateString()}</p>
               </Card>
             </>
           ) : (
             <>
-              <Circle size={64} color="#ff4d4f" />
+              <CheckCircle size={64} color="#ff4d4f" />
               <Title level={3} style={{ marginTop: 20 }}>
                 Enrollment Failed
               </Title>
@@ -719,8 +369,7 @@ const EnrollmentPage: React.FC = () => {
                 setEnrollmentResult(null);
                 form.resetFields();
                 setStudentData({});
-                setSelectedFaculty('');
-                setDepartments([]);
+                setIsCameraActive(false);
               }}
             >
               {enrollmentResult?.success ? 'Enroll Another Student' : 'Try Again'}
@@ -745,35 +394,19 @@ const EnrollmentPage: React.FC = () => {
             style={{ marginBottom: 20 }}
           />
           
-          {studentData.name ? (
+          {studentData.name && (
             <Card style={{ marginBottom: 20, maxWidth: 600, margin: '0 auto 20px' }}>
               <Row gutter={[16, 16]}>
-                <Col xs={24} md={12}>
+                <Col span={12}>
                   <Text strong>Student: </Text>
                   <Text>{studentData.name}</Text>
                 </Col>
-                <Col xs={24} md={12}>
+                <Col span={12}>
                   <Text strong>Matric: </Text>
                   <Tag color="blue">{studentData.matric_number}</Tag>
                 </Col>
               </Row>
-              <Row gutter={[16, 16]} style={{ marginTop: 10 }}>
-                <Col xs={24}>
-                  <Text strong>Program: </Text>
-                  <Text>
-                    {programs.find(p => p.id === studentData.program_id)?.name || 'Not selected'}
-                  </Text>
-                </Col>
-              </Row>
             </Card>
-          ) : (
-            <Alert
-              message="No Student Data"
-              description="Please go back and fill in student information first"
-              type="warning"
-              showIcon
-              style={{ marginBottom: 20 }}
-            />
           )}
           
           <div style={{ maxWidth: 640, margin: '0 auto' }}>
@@ -795,12 +428,13 @@ const EnrollmentPage: React.FC = () => {
                   size="large"
                   icon={<Camera size={20} />}
                   onClick={() => setIsCameraActive(true)}
+                  loading={loading}
                 >
                   Start Face Enrollment
                 </Button>
                 <div style={{ marginTop: 20 }}>
                   <Button onClick={handleBack}>
-                    Back to Academic Details
+                    Back to Previous Step
                   </Button>
                 </div>
               </Card>
@@ -845,7 +479,7 @@ const EnrollmentPage: React.FC = () => {
                 type="primary" 
                 onClick={handleNext} 
                 size="large"
-                loading={loading && currentStep === 1}
+                loading={loading}
               >
                 {currentStep === 1 ? 'Proceed to Face Enrollment' : 'Next'}
               </Button>

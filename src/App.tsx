@@ -20,7 +20,8 @@ import {
   Upload,
   Download,
   UserPlus,
-  QrCode
+  QrCode,
+  Book
 } from 'lucide-react';
 import EnrollmentPage from './pages/EnrollmentPage';
 import AttendancePage from './pages/AttendancePage';
@@ -28,9 +29,13 @@ import Dashboard from './pages/Dashboard';
 import ImageManagementPage from './pages/ImageManagementPage';
 import SyncPage from './pages/SyncPage';
 import PWAInstallPrompt from './components/PWAInstallPrompt';
+import CourseRegistrationPage from './pages/CourseRegistrationPage';
+import LecturerAttendancePage from './pages/LecturerAttendancePage';
 
 import { supabase } from './lib/supabase';
 import './App.css';
+import CourseManagementPage from './pages/CourseManagementPage';
+
 
 const { Header, Sider, Content, Footer } = Layout;
 const { Title, Text } = Typography;
@@ -80,6 +85,24 @@ const menuItems = [
     icon: React.createElement(Settings, { size: 16 }),
     label: <Link to="/settings">Settings</Link>,
   },
+  // Add to menu items:
+{
+  key: 'courses',
+  icon: React.createElement(Book, { size: 17 }),
+  label: <Link to="/courses">Course Management</Link>,
+},
+
+{
+  key: 'course-reg',
+  icon: React.createElement(Book, { size: 18 }),
+  label: <Link to="/course-registration">Course Registration</Link>,
+},
+{
+  key: 'lecturer-attendance',
+  icon: React.createElement(Camera, { size: 19 }),
+  label: <Link to="/lecturer-attendance">Take Attendance (Lecturer)</Link>,
+},
+
 ];
 
 // Home page cards component
@@ -644,6 +667,10 @@ npm start
                           </div>
                         </div>
                       } />
+                    
+<Route path="/course-registration" element={<CourseRegistrationPage />} />
+<Route path="/lecturer-attendance" element={<LecturerAttendancePage />} />
+<Route path="/courses" element={<CourseManagementPage />} />
                       <Route path="/export" element={
                         <div style={{ textAlign: 'center', padding: '40px 20px' }}>
                           <Download size={48} style={{ opacity: 0.3, marginBottom: 20 }} />
