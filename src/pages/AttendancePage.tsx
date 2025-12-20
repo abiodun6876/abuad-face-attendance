@@ -1,4 +1,4 @@
-// src/pages/AttendancePage.tsx - FIXED VERSION
+// src/pages/AttendancePage.tsx - ENHANCED WITH FULL CRUD OPERATIONS
 import React, { useState, useEffect } from 'react';
 import { 
   Card, 
@@ -17,7 +17,13 @@ import {
   Statistic,
   Table,
   Modal,
-  message
+  message,
+  Popconfirm,
+  Drawer,
+  Tabs,
+  Upload,
+  Tooltip,
+  Switch
 } from 'antd';
 import { 
   Camera, 
@@ -32,12 +38,26 @@ import {
   Search,
   Download,
   Filter,
-  Eye
+  Eye,
+  Edit,
+  Trash2,
+  Plus,
+  Save,
+  X,
+  UserPlus,
+  FileText,
+  Upload as UploadIcon,
+  Check,
+  AlertCircle,
+  BarChart3,
+  Database,
+  HardDrive
 } from 'lucide-react';
 import FaceCamera from '../components/FaceCamera';
 import { supabase } from '../lib/supabase';
 
 const { Title, Text } = Typography;
+const { TabPane } = Tabs;
 
 const AttendancePage: React.FC = () => {
   const [selectedFaculty, setSelectedFaculty] = useState<string>('');
@@ -53,16 +73,47 @@ const AttendancePage: React.FC = () => {
   const [departments, setDepartments] = useState<any[]>([]);
   const [courses, setCourses] = useState<any[]>([]);
   const [form] = Form.useForm();
-  const [viewMode, setViewMode] = useState<'take' | 'view'>('take');
+  const [viewMode, setViewMode] = useState<'take' | 'view' | 'manage'>('take');
   const [selectedCourse, setSelectedCourse] = useState<string>('');
   const [courseStudents, setCourseStudents] = useState<any[]>([]);
   const [showStudentModal, setShowStudentModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingRecord, setEditingRecord] = useState<any>(null);
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [showStats, setShowStats] = useState(false);
+  const [localRecords, setLocalRecords] = useState<any[]>([]);
+  const [useLocalStorage, setUseLocalStorage] = useState(false);
+  const [activeTab, setActiveTab] = useState<string>('online'); // CORRECT
 
   // Fetch initial data
   useEffect(() => {
     fetchFaculties();
     fetchCourses();
+    loadLocalRecords();
   }, []);
+
+  // Load records from localStorage
+  const loadLocalRecords = () => {
+    try {
+      const keys = Object.keys(localStorage);
+      const localAttendanceKeys = keys.filter(key => key.startsWith('attendance_'));
+      const records: any[] = [];
+      
+      localAttendanceKeys.forEach(key => {
+        const record = JSON.parse(localStorage.getItem(key) || '{}');
+        records.push({
+          ...record,
+          id: key,
+          source: 'local_storage',
+          is_local: true
+        });
+      });
+      
+      setLocalRecords(records);
+    } catch (error) {
+      console.error('Error loading local records:', error);
+    }
+  };
 
   const fetchFaculties = async () => {
     try {
@@ -99,18 +150,28 @@ const AttendancePage: React.FC = () => {
 
   const fetchCourses = async () => {
     try {
-      // In a real system, you would have a courses table
-      // For now, we'll use sample data
-      const sampleCourses = [
-        { code: 'CSC101', title: 'Introduction to Computer Science', level: 100 },
-        { code: 'CSC201', title: 'Data Structures', level: 200 },
-        { code: 'CSC301', title: 'Database Systems', level: 300 },
-        { code: 'EEE101', title: 'Basic Electrical Engineering', level: 100 },
-        { code: 'EEE201', title: 'Circuit Analysis', level: 200 },
-        { code: 'MTH101', title: 'Calculus I', level: 100 },
-        { code: 'MTH201', title: 'Calculus II', level: 200 },
-      ];
-      setCourses(sampleCourses);
+      // Fetch from database if available, otherwise use sample data
+      const { data, error } = await supabase
+        .from('courses')
+        .select('*')
+        .eq('is_active', true)
+        .order('code');
+
+      if (!error && data && data.length > 0) {
+        setCourses(data);
+      } else {
+        // Fallback to sample data
+        const sampleCourses = [
+          { code: 'CSC101', title: 'Introduction to Computer Science', level: 100 },
+          { code: 'CSC201', title: 'Data Structures', level: 200 },
+          { code: 'CSC301', title: 'Database Systems', level: 300 },
+          { code: 'EEE101', title: 'Basic Electrical Engineering', level: 100 },
+          { code: 'EEE201', title: 'Circuit Analysis', level: 200 },
+          { code: 'MTH101', title: 'Calculus I', level: 100 },
+          { code: 'MTH201', title: 'Calculus II', level: 200 },
+        ];
+        setCourses(sampleCourses);
+      }
     } catch (error) {
       console.error('Error fetching courses:', error);
     }
@@ -141,6 +202,149 @@ const AttendancePage: React.FC = () => {
     }
   };
 
+  // CRUD Operations for Database
+  const createAttendanceRecord = async (record: any, isLocal = false) => {
+    try {
+      if (isLocal || useLocalStorage) {
+        // Save to localStorage
+        const key = `attendance_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        const localRecord = {
+          ...record,
+          id: key,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          source: 'local_manual',
+          is_local: true
+        };
+        
+        localStorage.setItem(key, JSON.stringify(localRecord));
+        setLocalRecords(prev => [...prev, localRecord]);
+        message.success('Attendance saved locally');
+        return { data: localRecord, error: null };
+      } else {
+        // Save to database
+        const { data, error } = await supabase
+          .from('attendance_records')
+          .insert([record])
+          .select()
+          .single();
+
+        if (!error) {
+          message.success('Attendance saved to database');
+        }
+        return { data, error };
+      }
+    } catch (error: any) {
+      console.error('Error saving attendance:', error);
+      return { data: null, error };
+    }
+  };
+
+  const updateAttendanceRecord = async (id: string, updates: any, isLocal = false) => {
+    try {
+      if (isLocal) {
+        // Update in localStorage
+        const key = id;
+        const existing = JSON.parse(localStorage.getItem(key) || '{}');
+        const updated = {
+          ...existing,
+          ...updates,
+          updated_at: new Date().toISOString()
+        };
+        
+        localStorage.setItem(key, JSON.stringify(updated));
+        loadLocalRecords(); // Refresh local records
+        message.success('Local record updated');
+        return { data: updated, error: null };
+      } else {
+        // Update in database
+        const { data, error } = await supabase
+          .from('attendance_records')
+          .update(updates)
+          .eq('id', id)
+          .select()
+          .single();
+
+        if (!error) {
+          message.success('Record updated successfully');
+        }
+        return { data, error };
+      }
+    } catch (error: any) {
+      console.error('Error updating record:', error);
+      return { data: null, error };
+    }
+  };
+
+  const deleteAttendanceRecord = async (id: string, isLocal = false) => {
+    try {
+      if (isLocal) {
+        // Delete from localStorage
+        localStorage.removeItem(id);
+        setLocalRecords(prev => prev.filter(record => record.id !== id));
+        message.success('Local record deleted');
+        return { error: null };
+      } else {
+        // Delete from database
+        const { error } = await supabase
+          .from('attendance_records')
+          .delete()
+          .eq('id', id);
+
+        if (!error) {
+          message.success('Record deleted successfully');
+        }
+        return { error };
+      }
+    } catch (error: any) {
+      console.error('Error deleting record:', error);
+      return { error };
+    }
+  };
+
+  // Sync local records to database
+  const syncLocalToDatabase = async () => {
+    setLoading(true);
+    try {
+      const localKeys = Object.keys(localStorage).filter(key => key.startsWith('attendance_'));
+      let successCount = 0;
+      let errorCount = 0;
+
+      for (const key of localKeys) {
+        const record = JSON.parse(localStorage.getItem(key) || '{}');
+        
+        // Remove local-only fields
+        const { id, is_local, source, ...dbRecord } = record;
+        
+        const { error } = await supabase
+          .from('attendance_records')
+          .insert([dbRecord]);
+
+        if (!error) {
+          localStorage.removeItem(key);
+          successCount++;
+        } else {
+          errorCount++;
+        }
+      }
+
+      loadLocalRecords();
+      
+      if (successCount > 0) {
+        message.success(`Synced ${successCount} records to database`);
+      }
+      if (errorCount > 0) {
+        message.error(`Failed to sync ${errorCount} records`);
+      }
+      
+    } catch (error) {
+      console.error('Error syncing records:', error);
+      message.error('Failed to sync records');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleFaceScanComplete = async (result: any) => {
     console.log('Attendance scan result:', result);
     
@@ -148,7 +352,7 @@ const AttendancePage: React.FC = () => {
       try {
         setLoading(true);
         
-        // Check if student exists in database
+        // Check if student exists
         const { data: studentData } = await supabase
           .from('students')
           .select('*')
@@ -157,7 +361,7 @@ const AttendancePage: React.FC = () => {
 
         const student = studentData || result.student;
 
-        // Save attendance record to Supabase
+        // Create attendance record
         const attendanceRecord = {
           student_id: student?.student_id || student?.id || `student_${Date.now()}`,
           student_name: student?.name || result.student?.name || 'Unknown Student',
@@ -165,52 +369,38 @@ const AttendancePage: React.FC = () => {
           course_code: courseCode,
           course_title: courseTitle,
           faculty_id: selectedFaculty,
-          department_id: selectedDepartment,
+          department_name: departments.find(d => d.id === selectedDepartment)?.name || '',
           level: selectedLevel,
-          timestamp: new Date().toISOString(),
+          attendance_date: new Date().toISOString().split('T')[0],
+          check_in_time: new Date().toISOString(),
           status: 'present',
-          confidence: result.confidence || 0.85,
-          source: 'face_recognition',
+          verification_method: 'face_recognition',
+          confidence_score: result.confidence || 0.85,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         };
 
         console.log('Saving attendance record:', attendanceRecord);
 
-        const { data, error } = await supabase
-          .from('attendance_records')
-          .insert([attendanceRecord])
-          .select()
-          .single();
+        const { data, error } = await createAttendanceRecord(attendanceRecord, useLocalStorage);
 
         if (error) {
           console.error('Error saving attendance:', error);
-          
-          // If table doesn't exist, create it
-          if (error.message.includes('relation "attendance_records" does not exist')) {
-            message.error('Attendance table not found. Please create it first.');
-            result.message = 'Database table not configured';
-            result.success = false;
-          } else if (error.message.includes('offline') || error.message.includes('network')) {
-            // Save to local storage for offline
-            localStorage.setItem(
-              `pending_attendance_${Date.now()}`,
-              JSON.stringify(attendanceRecord)
-            );
-            result.message = 'Attendance saved locally (offline mode)';
-            result.offline = true;
-          } else {
-            result.message = `Failed to save: ${error.message}`;
-            result.success = false;
-          }
+          result.message = `Failed to save: ${error.message}`;
+          result.success = false;
         } else {
-          result.recordId = data.id;
+          result.recordId = data?.id;
           result.student = student;
           result.attendanceRecord = data;
-          message.success('Attendance recorded successfully!');
+          result.isLocal = useLocalStorage;
+          message.success(`Attendance recorded ${useLocalStorage ? 'locally' : 'to database'}!`);
           
-          // Refresh today's attendance
-          fetchTodaysAttendance();
+          // Refresh attendance
+          if (!useLocalStorage) {
+            fetchTodaysAttendance();
+          } else {
+            loadLocalRecords();
+          }
         }
 
       } catch (error: any) {
@@ -244,22 +434,19 @@ const AttendancePage: React.FC = () => {
     
     setLoading(true);
     try {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const todayStr = today.toISOString();
+      const today = new Date().toISOString().split('T')[0];
       
       const { data, error } = await supabase
         .from('attendance_records')
         .select('*')
         .eq('course_code', courseCode)
-        .gte('timestamp', todayStr)
-        .order('timestamp', { ascending: false });
+        .eq('attendance_date', today)
+        .order('check_in_time', { ascending: false });
       
       if (!error) {
         setAttendanceRecords(data || []);
       } else {
         console.error('Error fetching attendance:', error);
-        // If table doesn't exist, show empty
         setAttendanceRecords([]);
       }
     } catch (error) {
@@ -272,8 +459,6 @@ const AttendancePage: React.FC = () => {
 
   const fetchCourseStudents = async (courseCode: string) => {
     try {
-      // In a real system, you would fetch students registered for this course
-      // For now, we'll fetch all students and filter by level
       const { data: students, error } = await supabase
         .from('students')
         .select('*')
@@ -281,7 +466,6 @@ const AttendancePage: React.FC = () => {
         .order('name');
 
       if (!error) {
-        // Filter students who should be taking this course (by level)
         const course = courses.find(c => c.code === courseCode);
         if (course) {
           const filteredStudents = students.filter(s => 
@@ -297,7 +481,7 @@ const AttendancePage: React.FC = () => {
     }
   };
 
-  const handleManualAttendance = (student: any, status: 'present' | 'absent') => {
+  const handleManualAttendance = (student: any, status: 'present' | 'absent' | 'late' | 'excused') => {
     const attendanceRecord = {
       student_id: student.student_id || student.id,
       student_name: student.name,
@@ -307,25 +491,65 @@ const AttendancePage: React.FC = () => {
       faculty_id: selectedFaculty,
       department_id: selectedDepartment,
       level: selectedLevel,
-      timestamp: new Date().toISOString(),
+      attendance_date: new Date().toISOString().split('T')[0],
+      check_in_time: new Date().toISOString(),
       status: status,
-      source: 'manual',
+      verification_method: 'manual',
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     };
 
-    supabase
-      .from('attendance_records')
-      .insert([attendanceRecord])
+    createAttendanceRecord(attendanceRecord, useLocalStorage)
       .then(({ error }) => {
         if (error) {
           console.error('Error saving manual attendance:', error);
           message.error('Failed to save attendance');
         } else {
           message.success(`Marked ${student.name} as ${status}`);
-          fetchTodaysAttendance();
+          if (!useLocalStorage) {
+            fetchTodaysAttendance();
+          } else {
+            loadLocalRecords();
+          }
         }
       });
+  };
+
+  const handleEditRecord = (record: any) => {
+    setEditingRecord(record);
+    setShowEditModal(true);
+  };
+
+  const handleDeleteRecord = async (record: any) => {
+    await deleteAttendanceRecord(record.id, record.is_local);
+    if (!record.is_local) {
+      fetchTodaysAttendance();
+    } else {
+      loadLocalRecords();
+    }
+  };
+
+  const handleSaveEdit = async () => {
+    try {
+      const updates = {
+        status: editingRecord.status,
+        remarks: editingRecord.remarks || ''
+      };
+
+      await updateAttendanceRecord(editingRecord.id, updates, editingRecord.is_local);
+      
+      if (!editingRecord.is_local) {
+        fetchTodaysAttendance();
+      } else {
+        loadLocalRecords();
+      }
+      
+      setShowEditModal(false);
+      setEditingRecord(null);
+    } catch (error) {
+      console.error('Error saving edit:', error);
+      message.error('Failed to update record');
+    }
   };
 
   const exportAttendance = () => {
@@ -333,7 +557,7 @@ const AttendancePage: React.FC = () => {
       course: courseCode,
       title: courseTitle,
       date: new Date().toLocaleDateString(),
-      records: attendanceRecords
+      records: [...attendanceRecords, ...localRecords]
     };
     
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -345,9 +569,9 @@ const AttendancePage: React.FC = () => {
     URL.revokeObjectURL(url);
   };
 
-  const totalAttendance = attendanceRecords.length;
-  const presentCount = attendanceRecords.filter(r => r.status === 'present').length;
-  const absentCount = attendanceRecords.filter(r => r.status === 'absent').length;
+  const totalAttendance = [...attendanceRecords, ...localRecords].length;
+  const presentCount = [...attendanceRecords, ...localRecords].filter(r => r.status === 'present').length;
+  const absentCount = [...attendanceRecords, ...localRecords].filter(r => r.status === 'absent').length;
 
   const studentColumns = [
     {
@@ -376,21 +600,31 @@ const AttendancePage: React.FC = () => {
       title: 'Actions',
       key: 'actions',
       render: (_: any, record: any) => (
-        <Space>
-          <Button
-            size="small"
-            type="primary"
-            onClick={() => handleManualAttendance(record, 'present')}
-          >
-            Mark Present
-          </Button>
-          <Button
-            size="small"
-            danger
-            onClick={() => handleManualAttendance(record, 'absent')}
-          >
-            Mark Absent
-          </Button>
+        <Space wrap>
+          <Tooltip title="Mark Present">
+            <Button
+              size="small"
+              type="primary"
+              icon={<CheckCircle size={12} />}
+              onClick={() => handleManualAttendance(record, 'present')}
+            />
+          </Tooltip>
+          <Tooltip title="Mark Absent">
+            <Button
+              size="small"
+              danger
+              icon={<XCircle size={12} />}
+              onClick={() => handleManualAttendance(record, 'absent')}
+            />
+          </Tooltip>
+          <Tooltip title="Mark Late">
+            <Button
+              size="small"
+              type="default"
+              icon={<Clock size={12} />}
+              onClick={() => handleManualAttendance(record, 'late')}
+            />
+          </Tooltip>
         </Space>
       ),
     },
@@ -403,15 +637,93 @@ const AttendancePage: React.FC = () => {
       key: 'student_name',
     },
     {
-      title: 'Matric Number',
+      title: 'Matric',
       dataIndex: 'matric_number',
       key: 'matric_number',
     },
     {
       title: 'Time',
-      dataIndex: 'timestamp',
-      key: 'timestamp',
-      render: (timestamp: string) => new Date(timestamp).toLocaleTimeString(),
+      dataIndex: 'check_in_time',
+      key: 'check_in_time',
+      render: (time: string) => new Date(time).toLocaleTimeString(),
+    },
+    {
+      title: 'Status',
+      dataIndex: 'status',
+      key: 'status',
+      render: (status: string, record: any) => (
+        <Tag color={
+          status === 'present' ? 'success' :
+          status === 'late' ? 'warning' :
+          status === 'excused' ? 'blue' : 'error'
+        }>
+          {status.toUpperCase()}
+          {record.is_local && ' (Local)'}
+        </Tag>
+      ),
+    },
+    {
+      title: 'Method',
+      dataIndex: 'verification_method',
+      key: 'verification_method',
+      render: (method: string) => (
+        <Tag color={method === 'face_recognition' ? 'blue' : 'orange'}>
+          {method}
+        </Tag>
+      ),
+    },
+    {
+      title: 'Actions',
+      key: 'actions',
+      render: (_: any, record: any) => (
+        <Space>
+          <Tooltip title="Edit Record">
+            <Button
+              size="small"
+              icon={<Edit size={12} />}
+              onClick={() => handleEditRecord(record)}
+            />
+          </Tooltip>
+          <Popconfirm
+            title="Delete this record?"
+            description="Are you sure you want to delete this attendance record?"
+            onConfirm={() => handleDeleteRecord(record)}
+            okText="Yes"
+            cancelText="No"
+          >
+            <Tooltip title="Delete Record">
+              <Button
+                size="small"
+                danger
+                icon={<Trash2 size={12} />}
+              />
+            </Tooltip>
+          </Popconfirm>
+        </Space>
+      ),
+    },
+  ];
+
+  const localColumns = [
+    {
+      title: 'Student',
+      dataIndex: 'student_name',
+      key: 'student_name',
+    },
+    {
+      title: 'Matric',
+      dataIndex: 'matric_number',
+      key: 'matric_number',
+    },
+    {
+      title: 'Course',
+      dataIndex: 'course_code',
+      key: 'course_code',
+    },
+    {
+      title: 'Date',
+      dataIndex: 'attendance_date',
+      key: 'attendance_date',
     },
     {
       title: 'Status',
@@ -424,13 +736,50 @@ const AttendancePage: React.FC = () => {
       ),
     },
     {
-      title: 'Source',
-      dataIndex: 'source',
-      key: 'source',
-      render: (source: string) => (
-        <Tag color={source === 'face_recognition' ? 'blue' : 'orange'}>
-          {source}
-        </Tag>
+      title: 'Actions',
+      key: 'actions',
+      render: (_: any, record: any) => (
+        <Space>
+          <Tooltip title="Edit">
+            <Button
+              size="small"
+              icon={<Edit size={12} />}
+              onClick={() => handleEditRecord(record)}
+            />
+          </Tooltip>
+          <Tooltip title="Delete">
+            <Popconfirm
+              title="Delete local record?"
+              onConfirm={() => handleDeleteRecord(record)}
+            >
+              <Button
+                size="small"
+                danger
+                icon={<Trash2 size={12} />}
+              />
+            </Popconfirm>
+          </Tooltip>
+          <Tooltip title="Sync to DB">
+            <Button
+              size="small"
+              type="primary"
+              icon={<Database size={12} />}
+              onClick={async () => {
+                // Remove local-only fields
+                const { id, is_local, ...dbRecord } = record;
+                const { error } = await supabase
+                  .from('attendance_records')
+                  .insert([dbRecord]);
+
+                if (!error) {
+                  localStorage.removeItem(id);
+                  loadLocalRecords();
+                  message.success('Record synced to database');
+                }
+              }}
+            />
+          </Tooltip>
+        </Space>
       ),
     },
   ];
@@ -443,20 +792,43 @@ const AttendancePage: React.FC = () => {
       </Text>
 
       <Card style={{ marginTop: 20 }}>
-        <div style={{ marginBottom: 20 }}>
+        <div style={{ marginBottom: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Space>
             <Button
               type={viewMode === 'take' ? 'primary' : 'default'}
+              icon={<Camera size={16} />}
               onClick={() => setViewMode('take')}
             >
               Take Attendance
             </Button>
             <Button
               type={viewMode === 'view' ? 'primary' : 'default'}
+              icon={<Eye size={16} />}
               onClick={() => setViewMode('view')}
             >
-              View/Manage Attendance
+              View Records
             </Button>
+            <Button
+              type={viewMode === 'manage' ? 'primary' : 'default'}
+              icon={<Edit size={16} />}
+              onClick={() => setViewMode('manage')}
+            >
+              Manage Records
+            </Button>
+          </Space>
+
+          <Space>
+            <Tooltip title="Toggle Local/Database Storage">
+              <Switch
+                checkedChildren={<Database size={12} />}
+                unCheckedChildren={<HardDrive size={12} />}
+                checked={useLocalStorage}
+                onChange={setUseLocalStorage}
+              />
+            </Tooltip>
+            <Text type="secondary">
+              {useLocalStorage ? 'Local Storage' : 'Database'}
+            </Text>
           </Space>
         </div>
 
@@ -466,7 +838,16 @@ const AttendancePage: React.FC = () => {
               <>
                 <Alert
                   message="Attendance Setup"
-                  description="Select the course details before starting attendance"
+                  description={
+                    <div>
+                      <p>Select course details to start attendance</p>
+                      <p>
+                        <Tag color={useLocalStorage ? 'orange' : 'blue'} icon={useLocalStorage ? <HardDrive /> : <Database />}>
+                          {useLocalStorage ? 'Saving to Local Storage' : 'Saving to Database'}
+                        </Tag>
+                      </p>
+                    </div>
+                  }
                   type="info"
                   showIcon
                   style={{ marginBottom: 20 }}
@@ -564,43 +945,64 @@ const AttendancePage: React.FC = () => {
                     </Button>
                     
                     {courseCode && (
-                      <>
+                      <Space style={{ marginLeft: 10 }}>
                         <Button
-                          style={{ marginLeft: 10 }}
-                          icon={<Eye size={16} />}
+                          icon={<UserPlus size={16} />}
                           onClick={() => {
                             fetchCourseStudents(courseCode);
                             setShowStudentModal(true);
                           }}
                         >
-                          Manual Attendance
+                          Manual Entry
                         </Button>
                         <Button
-                          style={{ marginLeft: 10 }}
                           icon={<RefreshCw size={16} />}
                           onClick={fetchTodaysAttendance}
                           loading={loading}
                         >
-                          View Today's Attendance
+                          Refresh
                         </Button>
-                      </>
+                        <Button
+                          icon={<BarChart3 size={16} />}
+                          onClick={() => setShowStats(true)}
+                        >
+                          Stats
+                        </Button>
+                      </Space>
                     )}
                   </div>
                 </Form>
 
                 {/* Today's Attendance Summary */}
-                {attendanceRecords.length > 0 && (
+                {(attendanceRecords.length > 0 || localRecords.length > 0) && (
                   <div style={{ marginTop: 30 }}>
-                    <Title level={4}>Today's Attendance Summary</Title>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                      <Title level={4}>Today's Attendance Summary</Title>
+                      <Space>
+                        <Button
+                          icon={<Download size={16} />}
+                          onClick={exportAttendance}
+                        >
+                          Export
+                        </Button>
+                        <Button
+                          icon={<UploadIcon size={16} />}
+                          onClick={() => setShowUploadModal(true)}
+                        >
+                          Import
+                        </Button>
+                      </Space>
+                    </div>
+                    
                     <Row gutter={[16, 16]} style={{ marginBottom: 20 }}>
-                      <Col xs={24} sm={8}>
+                      <Col xs={24} sm={6}>
                         <Statistic
-                          title="Total Students"
+                          title="Total Records"
                           value={totalAttendance}
-                          prefix={<Users size={20} />}
+                          prefix={<FileText size={20} />}
                         />
                       </Col>
-                      <Col xs={24} sm={8}>
+                      <Col xs={24} sm={6}>
                         <Statistic
                           title="Present"
                           value={presentCount}
@@ -608,7 +1010,7 @@ const AttendancePage: React.FC = () => {
                           prefix={<CheckCircle size={20} />}
                         />
                       </Col>
-                      <Col xs={24} sm={8}>
+                      <Col xs={24} sm={6}>
                         <Statistic
                           title="Absent"
                           value={absentCount}
@@ -616,29 +1018,81 @@ const AttendancePage: React.FC = () => {
                           prefix={<XCircle size={20} />}
                         />
                       </Col>
+                      <Col xs={24} sm={6}>
+                        <Statistic
+                          title="Local Records"
+                          value={localRecords.length}
+                          valueStyle={{ color: '#fa8c16' }}
+                          prefix={<HardDrive size={20} />}
+                        />
+                      </Col>
                     </Row>
 
-                    <div style={{ marginBottom: 20 }}>
-                      <Button
-                        icon={<Download size={16} />}
-                        onClick={exportAttendance}
-                      >
-                        Export Attendance
-                      </Button>
-                    </div>
-
-                    <Table
-                      columns={attendanceColumns}
-                      dataSource={attendanceRecords}
-                      rowKey="id"
-                      size="small"
-                      pagination={{ pageSize: 10 }}
-                    />
+                    <Tabs 
+  activeKey={activeTab} 
+  onChange={(key: string) => setActiveTab(key)}
+>
+  <TabPane tab="Database Records" key="online">
+    <Table
+      columns={attendanceColumns}
+      dataSource={attendanceRecords}
+      rowKey="id"
+      size="small"
+      pagination={{ pageSize: 10 }}
+    />
+  </TabPane>
+  <TabPane tab="Local Records" key="offline">
+    <Alert
+      message="Local Storage Records"
+      description="These records are saved in your browser. Sync them to the database when online."
+      type="warning"
+      showIcon
+      style={{ marginBottom: 20 }}
+      action={
+        <Button
+          type="primary"
+          size="small"
+          icon={<Database size={12} />}
+          onClick={syncLocalToDatabase}
+          loading={loading}
+        >
+          Sync All to DB
+        </Button>
+      }
+    />
+    <Table
+      columns={localColumns}
+      dataSource={localRecords}
+      rowKey="id"
+      size="small"
+      pagination={{ pageSize: 10 }}
+      locale={{
+        emptyText: 'No local records found'
+      }}
+    />
+  </TabPane>
+</Tabs>
                   </div>
                 )}
               </>
             ) : (
               <div style={{ textAlign: 'center' }}>
+                <Alert
+                  message="Face Recognition Mode"
+                  description={
+                    <div>
+                      <p>Students should face the camera clearly</p>
+                      <p>
+                        <Tag color={useLocalStorage ? 'orange' : 'blue'} icon={useLocalStorage ? <HardDrive /> : <Database />}>
+                          {useLocalStorage ? 'Saving to Local Storage' : 'Saving to Database'}
+                        </Tag>
+                      </p>
+                    </div>
+                  }
+                  type="info"
+                  showIcon
+                  style={{ marginBottom: 20 }}
+                />
                 <FaceCamera
                   mode="attendance"
                   onAttendanceComplete={handleFaceScanComplete}
@@ -663,10 +1117,11 @@ const AttendancePage: React.FC = () => {
                         <p><strong>Matric Number:</strong> {attendanceResult.student?.matric_number || 'N/A'}</p>
                         <p><strong>Course:</strong> {courseCode} - {courseTitle}</p>
                         <p><strong>Time:</strong> {new Date().toLocaleTimeString()}</p>
-                        <p><strong>Confidence:</strong> {(attendanceResult.confidence * 100).toFixed(1)}%</p>
-                        {attendanceResult.offline && (
-                          <p><strong>Status:</strong> <Tag color="orange">Saved locally (offline)</Tag></p>
-                        )}
+                        <p><strong>Storage:</strong> 
+                          <Tag color={attendanceResult.isLocal ? 'orange' : 'blue'} style={{ marginLeft: 8 }}>
+                            {attendanceResult.isLocal ? 'Local Storage' : 'Database'}
+                          </Tag>
+                        </p>
                       </div>
                     ) : (
                       <div>
@@ -697,11 +1152,11 @@ const AttendancePage: React.FC = () => {
               </div>
             )}
           </>
-        ) : (
+        ) : viewMode === 'view' ? (
           <div>
             <Alert
-              message="Attendance Management"
-              description="View and manage attendance records"
+              message="Attendance Records"
+              description="View and search attendance records"
               type="info"
               showIcon
               style={{ marginBottom: 20 }}
@@ -716,7 +1171,10 @@ const AttendancePage: React.FC = () => {
                     label: `${c.code} - ${c.title}`,
                     value: c.code,
                   }))}
-                  onChange={(value) => setSelectedCourse(value)}
+                  onChange={(value) => {
+                    setSelectedCourse(value);
+                    setCourseCode(value);
+                  }}
                 />
               </Col>
               <Col xs={24} md={12}>
@@ -726,26 +1184,125 @@ const AttendancePage: React.FC = () => {
                     icon={<Search size={16} />}
                     onClick={() => {
                       if (selectedCourse) {
-                        setCourseCode(selectedCourse);
                         fetchTodaysAttendance();
-                        setViewMode('take');
                       } else {
                         message.warning('Please select a course first');
                       }
                     }}
                   >
-                    View Attendance
+                    Search
                   </Button>
                   <Button
-                    icon={<Download size={16} />}
-                    onClick={exportAttendance}
-                    disabled={!attendanceRecords.length}
+                    icon={<Filter size={16} />}
+                    onClick={() => {
+                      // Filter functionality
+                      Modal.info({
+                        title: 'Filter Options',
+                        content: 'Filter functionality will be implemented here',
+                      });
+                    }}
                   >
-                    Export
+                    Filter
                   </Button>
                 </Space>
               </Col>
             </Row>
+            
+            <div style={{ marginTop: 20 }}>
+              <Tabs 
+  activeKey={activeTab} 
+  onChange={(key: string) => setActiveTab(key)}
+>
+  <TabPane tab="Database Records" key="online">
+    <Table
+      columns={attendanceColumns}
+      dataSource={attendanceRecords}
+      rowKey="id"
+      pagination={{ pageSize: 15 }}
+      loading={loading}
+    />
+  </TabPane>
+  <TabPane tab="Local Records" key="offline">
+    <Table
+      columns={localColumns}
+      dataSource={localRecords}
+      rowKey="id"
+      pagination={{ pageSize: 15 }}
+    />
+  </TabPane>
+</Tabs>
+            </div>
+          </div>
+        ) : (
+          <div>
+            <Alert
+              message="Record Management"
+              description="Edit, delete, and manage attendance records"
+              type="info"
+              showIcon
+              style={{ marginBottom: 20 }}
+            />
+            
+            <div style={{ marginBottom: 20 }}>
+              <Space>
+                <Button
+                  type="primary"
+                  icon={<Plus size={16} />}
+                  onClick={() => {
+                    // Add new record functionality
+                    setViewMode('take');
+                  }}
+                >
+                  Add New Record
+                </Button>
+                <Button
+                  icon={<UploadIcon size={16} />}
+                  onClick={() => setShowUploadModal(true)}
+                >
+                  Bulk Import
+                </Button>
+                <Button
+                  icon={<Download size={16} />}
+                  onClick={exportAttendance}
+                >
+                  Export All
+                </Button>
+                {localRecords.length > 0 && (
+                  <Button
+                    type="primary"
+                    icon={<Database size={16} />}
+                    onClick={syncLocalToDatabase}
+                    loading={loading}
+                  >
+                    Sync Local to DB ({localRecords.length})
+                  </Button>
+                )}
+              </Space>
+            </div>
+            
+            <Tabs 
+  activeKey={activeTab} 
+  onChange={(key: string) => setActiveTab(key)}
+>
+  <TabPane tab="Database Records" key="online">
+    <Table
+      columns={attendanceColumns}
+      dataSource={attendanceRecords}
+      rowKey="id"
+      pagination={{ pageSize: 15 }}
+      loading={loading}
+      size="middle"
+    />
+  </TabPane>
+  <TabPane tab="Local Records" key="offline">
+    <Table
+      columns={localColumns}
+      dataSource={localRecords}
+      rowKey="id"
+      pagination={{ pageSize: 15 }}
+    />
+  </TabPane>
+</Tabs>
           </div>
         )}
       </Card>
@@ -756,11 +1313,15 @@ const AttendancePage: React.FC = () => {
         open={showStudentModal}
         onCancel={() => setShowStudentModal(false)}
         width={800}
-        footer={null}
+        footer={[
+          <Button key="close" onClick={() => setShowStudentModal(false)}>
+            Close
+          </Button>
+        ]}
       >
         <Alert
           message="Manual Attendance Entry"
-          description="Click 'Mark Present' or 'Mark Absent' for each student"
+          description="Click the action buttons to mark attendance status"
           type="info"
           showIcon
           style={{ marginBottom: 20 }}
@@ -776,13 +1337,139 @@ const AttendancePage: React.FC = () => {
             emptyText: 'No students found for this course'
           }}
         />
-        
-        <div style={{ marginTop: 20, textAlign: 'right' }}>
-          <Button onClick={() => setShowStudentModal(false)}>
-            Close
-          </Button>
-        </div>
       </Modal>
+
+      {/* Edit Record Modal */}
+      <Modal
+        title="Edit Attendance Record"
+        open={showEditModal}
+        onCancel={() => {
+          setShowEditModal(false);
+          setEditingRecord(null);
+        }}
+        onOk={handleSaveEdit}
+      >
+        {editingRecord && (
+          <Form layout="vertical">
+            <Form.Item label="Student">
+              <Input value={editingRecord.student_name} disabled />
+            </Form.Item>
+            <Form.Item label="Matric Number">
+              <Input value={editingRecord.matric_number} disabled />
+            </Form.Item>
+            <Form.Item label="Course">
+              <Input value={editingRecord.course_code} disabled />
+            </Form.Item>
+            <Form.Item label="Status" required>
+              <Select
+                value={editingRecord.status}
+                onChange={(value) => setEditingRecord({...editingRecord, status: value})}
+                options={[
+                  { label: 'Present', value: 'present' },
+                  { label: 'Absent', value: 'absent' },
+                  { label: 'Late', value: 'late' },
+                  { label: 'Excused', value: 'excused' },
+                ]}
+              />
+            </Form.Item>
+            <Form.Item label="Remarks">
+              <Input.TextArea
+                value={editingRecord.remarks}
+                onChange={(e) => setEditingRecord({...editingRecord, remarks: e.target.value})}
+                placeholder="Add remarks if any"
+              />
+            </Form.Item>
+          </Form>
+        )}
+      </Modal>
+
+      {/* Upload/Import Modal */}
+      <Modal
+        title="Import Attendance Records"
+        open={showUploadModal}
+        onCancel={() => setShowUploadModal(false)}
+        footer={null}
+      >
+        <Upload.Dragger
+          accept=".json,.csv"
+          beforeUpload={(file) => {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+              try {
+                const content = e.target?.result as string;
+                const records = JSON.parse(content);
+                
+                if (Array.isArray(records)) {
+                  records.forEach(record => {
+                    createAttendanceRecord(record, useLocalStorage);
+                  });
+                  message.success(`Imported ${records.length} records`);
+                } else {
+                  message.error('Invalid file format');
+                }
+              } catch (error) {
+                message.error('Failed to parse file');
+              }
+              setShowUploadModal(false);
+            };
+            reader.readAsText(file);
+            return false; // Prevent auto upload
+          }}
+        >
+          <p className="ant-upload-drag-icon">
+            <UploadIcon size={48} />
+          </p>
+          <p className="ant-upload-text">Click or drag file to upload</p>
+          <p className="ant-upload-hint">
+            Supports JSON files with attendance records
+          </p>
+        </Upload.Dragger>
+      </Modal>
+
+      {/* Statistics Drawer */}
+      <Drawer
+        title="Attendance Statistics"
+        open={showStats}
+        onClose={() => setShowStats(false)}
+        width={400}
+      >
+        {courseCode && (
+          <>
+            <Statistic
+              title="Total Students Today"
+              value={totalAttendance}
+              prefix={<Users size={20} />}
+            />
+            <Statistic
+              title="Present"
+              value={presentCount}
+              valueStyle={{ color: '#52c41a' }}
+              prefix={<CheckCircle size={20} />}
+              style={{ marginTop: 20 }}
+            />
+            <Statistic
+              title="Absent"
+              value={absentCount}
+              valueStyle={{ color: '#ff4d4f' }}
+              prefix={<XCircle size={20} />}
+              style={{ marginTop: 20 }}
+            />
+            <Statistic
+              title="Attendance Rate"
+              value={totalAttendance > 0 ? ((presentCount / totalAttendance) * 100).toFixed(1) : 0}
+              suffix="%"
+              style={{ marginTop: 20 }}
+            />
+            <Statistic
+              title="Local Records"
+              value={localRecords.length}
+              valueStyle={{ color: '#fa8c16' }}
+              prefix={<HardDrive size={20} />}
+              style={{ marginTop: 20 }}
+            />
+          </>
+        )}
+      </Drawer>
     </div>
   );
 };
