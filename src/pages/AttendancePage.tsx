@@ -21,7 +21,7 @@ import { Camera } from 'lucide-react';
 import { UserAddOutlined, TeamOutlined } from '@ant-design/icons';
 import FaceCamera from '../components/FaceCamera';
 import { supabase } from '../lib/supabase';
-import './App.css';
+
 
 const { Title, Text } = Typography;
 const { Option } = Select;
