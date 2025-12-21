@@ -748,9 +748,9 @@ button[type="primary"] {
   }
 }
 
-/* Mobile Select Dropdown Styles */
+/* Remove all the backdrop-related CSS, keep only dropdown positioning */
 .mobile-select-popup .ant-select-dropdown {
-  z-index: 1000 !important;
+  z-index: 1050 !important;
   position: fixed !important;
   width: 100vw !important;
   max-width: 100vw !important;
@@ -765,23 +765,6 @@ button[type="primary"] {
   overflow: auto !important;
 }
 
-/* Backdrop effect */
-.mobile-select-popup {
-  position: relative;
-}
-
-.mobile-select-popup::before {
-  content: '';
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  z-index: 999;
-}
-
-/* Animation for bottom sheet */
 @keyframes slideUp {
   from {
     transform: translateY(100%);
@@ -789,11 +772,6 @@ button[type="primary"] {
   to {
     transform: translateY(0);
   }
-}
-
-/* Ensure dropdown content is visible above backdrop */
-.mobile-select-popup .ant-select-dropdown {
-  z-index: 1000;
 }
 
 /* Adjust option padding for mobile */
