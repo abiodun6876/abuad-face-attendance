@@ -111,7 +111,8 @@ const HomeCards = () => {
   const screens = useBreakpoint();
   const isMobile = !screens.md;
 
-  const cards = [
+  
+    const cards = [
     {
       key: 'enroll',
       title: 'Student Enrollment',
@@ -135,6 +136,30 @@ const HomeCards = () => {
       icon: <Users size={isMobile ? 24 : 32} />,
       path: '/students',
       color: '#722ed1',
+    },
+    {
+      key: 'courses',
+      title: 'Course Management',
+      description: 'Manage courses and academic sessions',
+      icon: <Book size={isMobile ? 24 : 32} />,
+      path: '/courses',
+      color: '#8B4513', // Brown color for courses
+    },
+    {
+      key: 'course-registration',
+      title: 'Course Registration',
+      description: 'Register students for courses',
+      icon: <UserPlus size={isMobile ? 24 : 32} />,
+      path: '/course-registration',
+      color: '#800080', // Purple color
+    },
+    {
+      key: 'lecturer-attendance',
+      title: 'Lecturer Attendance',
+      description: 'Take attendance as lecturer',
+      icon: <Camera size={isMobile ? 24 : 32} />,
+      path: '/lecturer-attendance',
+      color: '#DAA520', // Goldenrod color
     },
     {
       key: 'events',
