@@ -21,6 +21,7 @@ import { Camera } from 'lucide-react';
 import { UserAddOutlined, TeamOutlined } from '@ant-design/icons';
 import FaceCamera from '../components/FaceCamera';
 import { supabase } from '../lib/supabase';
+import { Student } from '../types/database';
 
 
 const { Title, Text } = Typography;
@@ -43,6 +44,9 @@ const AttendancePage: React.FC = () => {
   const [scoreModalVisible, setScoreModalVisible] = useState(false);
   const [scoreInputValue, setScoreInputValue] = useState<number>(0);
 
+
+  
+
   // Fetch courses - FIXED to match your database schema
   const fetchCourses = async () => {
     const { data, error } = await supabase
@@ -58,105 +62,82 @@ const AttendancePage: React.FC = () => {
     }
   };
 
-  // Fetch students for selected course - FIXED with proper attendance data
-  const fetchStudents = async (courseId: string) => {
-    if (!courseId) return;
+  // Updated fetchStudents function in AttendancePage.tsx
+const fetchStudents = async (courseId: string) => {
+  if (!courseId) return;
+  
+  setLoading(true);
+  
+  try {
+    // 1. Get course details
+    const { data: courseData, error: courseError } = await supabase
+      .from('courses')
+      .select('id, code, title, level, semester')
+      .eq('id', courseId)
+      .single();
     
-    setLoading(true);
+    if (courseError) throw courseError;
     
-    try {
-      // Get course details
-      const { data: courseData, error: courseError } = await supabase
-        .from('courses')
-        .select('code, title, level, semester')
-        .eq('id', courseId)
-        .single();
+    // 2. Get enrolled student IDs for this course
+    const { data: enrollments, error: enrollmentError } = await supabase
+      .from('enrollments')
+      .select('student_id, status')
+      .eq('course_id', courseId)
+      .eq('status', 'active');
+    
+    if (enrollmentError) throw enrollmentError;
+    
+    if (enrollments && enrollments.length > 0) {
+      // Extract student IDs
+      const studentIds = enrollments.map(e => e.student_id);
       
-      if (courseError) throw courseError;
+      // 3. Get student details
+      const { data: studentsData, error: studentsError } = await supabase
+        .from('students')
+        .select('*')
+        .in('student_id', studentIds)
+        .eq('enrollment_status', 'enrolled');
       
-      if (courseData) {
-        // Fetch students at the same level
-        const { data: studentsData, error: studentsError } = await supabase
-          .from('students')
-          .select('*')
-          .eq('level', courseData.level)
-          .eq('enrollment_status', 'enrolled');
+      if (studentsError) throw studentsError;
+      
+      if (studentsData) {
+        const today = new Date().toISOString().split('T')[0];
         
-        if (studentsError) throw studentsError;
-        
-        if (studentsData) {
-          // Get today's date
-          const today = new Date().toISOString().split('T')[0];
-          
-          // For each student, fetch their attendance for today
-          const studentsWithAttendance = await Promise.all(
-            studentsData.map(async (student) => {
-              // Fetch attendance records for this student today for this course
-              const { data: attendanceRecords } = await supabase
-                .from('student_attendance')
-                .select('*')
-                .eq('student_id', student.student_id)
-                .eq('course_code', courseData.code)
-                .gte('check_in_time', `${today}T00:00:00`)
-                .lte('check_in_time', `${today}T23:59:59`)
-                .order('check_in_time', { ascending: false });
-              
-              return {
-                ...student,
-                attendance_record: attendanceRecords || [],
-                key: student.student_id
-              };
-            })
-          );
-          
-          setStudents(studentsWithAttendance);
-          
-          // Check if attendance_sessions table exists and create/get session
-          const { data: tableExists } = await supabase
-            .from('information_schema.tables')
-            .select('table_name')
-            .eq('table_name', 'attendance_sessions')
-            .single();
-          
-          if (tableExists) {
-            const weekNumber = Math.ceil(new Date().getDate() / 7);
-            
-            const { data: sessionData } = await supabase
-              .from('attendance_sessions')
+        // Process each student with attendance data
+        const studentsWithAttendance = await Promise.all(
+          studentsData.map(async (student) => {
+            // Fetch attendance records for today
+            const { data: attendanceRecords } = await supabase
+              .from('student_attendance')
               .select('*')
-              .eq('course_id', courseId)
-              .eq('session_date', today)
-              .single();
+              .eq('student_id', student.student_id)
+              .eq('course_code', courseData.code)
+              .gte('check_in_time', `${today}T00:00:00`)
+              .lte('check_in_time', `${today}T23:59:59`)
+              .order('check_in_time', { ascending: false });
             
-            if (sessionData) {
-              setAttendanceSession(sessionData);
-            } else {
-              // Create new session
-              const { data: newSession } = await supabase
-                .from('attendance_sessions')
-                .insert([{
-                  course_id: courseId,
-                  session_date: today,
-                  week_number: weekNumber,
-                  max_score: 2.00
-                }])
-                .select()
-                .single();
-              
-              if (newSession) {
-                setAttendanceSession(newSession);
-              }
-            }
-          }
-        }
+            return {
+              ...student,
+              attendance_record: attendanceRecords || [],
+              key: student.student_id
+            };
+          })
+        );
+        
+        setStudents(studentsWithAttendance);
       }
-    } catch (error: any) {
-      console.error('Error fetching students:', error);
-      message.error('Failed to load students');
-    } finally {
-      setLoading(false);
+    } else {
+      // No students enrolled in this course
+      setStudents([]);
     }
-  };
+    
+  } catch (error: any) {
+    console.error('Error fetching students:', error);
+    message.error('Failed to load students');
+  } finally {
+    setLoading(false);
+  }
+};
 
   useEffect(() => {
     fetchCourses();
@@ -412,6 +393,9 @@ const AttendancePage: React.FC = () => {
       setScoreInputValue(0);
     }
   };
+
+
+
 
   const handleMarkAllPresent = async () => {
     if (!selectedCourse || students.length === 0) return;

@@ -1,4 +1,19 @@
 // src/types/database.ts
+
+export interface Enrollment {
+  id: string;
+  student_id: string;
+  course_id: string;
+  course_code: string;
+  enrollment_date: string;
+  academic_session: string;
+  status: 'active' | 'inactive' | 'dropped';
+  created_at: string;
+  updated_at: string;
+  student?: Student;
+  course?: Course;
+}
+
 export interface Student {
   id: string;
   student_id: string;
@@ -39,6 +54,8 @@ export interface Student {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  // Add enrollment relationship
+  enrollments?: Enrollment[];
 }
 
 export interface Lecturer {
@@ -154,6 +171,7 @@ export interface Course {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  enrollments?: Enrollment[];
 }
 
 export interface Event {
