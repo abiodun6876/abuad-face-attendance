@@ -22,21 +22,17 @@ import { UserAddOutlined, TeamOutlined } from '@ant-design/icons';
 import FaceCamera from '../components/FaceCamera';
 import { supabase } from '../lib/supabase';
 
-
-
 const { Title, Text } = Typography;
 const { Option } = Select;
 const { useBreakpoint } = Grid;
 
 const AttendancePage: React.FC = () => {
-  // Move useBreakpoint INSIDE the component
   const screens = useBreakpoint();
   const isMobile = !screens.md;
   
   const [courses, setCourses] = useState<any[]>([]);
   const [selectedCourse, setSelectedCourse] = useState<string>('');
   const [students, setStudents] = useState<any[]>([]);
-  const [attendanceSession, setAttendanceSession] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [manualModalVisible, setManualModalVisible] = useState(false);
@@ -44,100 +40,98 @@ const AttendancePage: React.FC = () => {
   const [scoreModalVisible, setScoreModalVisible] = useState(false);
   const [scoreInputValue, setScoreInputValue] = useState<number>(0);
 
-
-  
-
-  // Fetch courses - FIXED to match your database schema
+  // Fetch courses
   const fetchCourses = async () => {
-    const { data, error } = await supabase
-      .from('courses')
-      .select('id, code, title, level, semester')
-      .order('code');
-    
-    if (error) {
+    try {
+      const { data, error } = await supabase
+        .from('courses')
+        .select('id, code, title, level, semester')
+        .order('code');
+      
+      if (error) throw error;
+      setCourses(data || []);
+    } catch (error: any) {
       console.error('Error fetching courses:', error);
       message.error('Failed to load courses');
-    } else {
-      setCourses(data || []);
     }
   };
 
-  // Updated fetchStudents function in AttendancePage.tsx
-const fetchStudents = async (courseId: string) => {
-  if (!courseId) return;
-  
-  setLoading(true);
-  
-  try {
-    // 1. Get course details
-    const { data: courseData, error: courseError } = await supabase
-      .from('courses')
-      .select('id, code, title, level, semester')
-      .eq('id', courseId)
-      .single();
+  // Fetch students for selected course
+  const fetchStudents = async (courseId: string) => {
+    if (!courseId) return;
     
-    if (courseError) throw courseError;
+    setLoading(true);
     
-    // 2. Get enrolled student IDs for this course
-    const { data: enrollments, error: enrollmentError } = await supabase
-      .from('enrollments')
-      .select('student_id, status')
-      .eq('course_id', courseId)
-      .eq('status', 'active');
-    
-    if (enrollmentError) throw enrollmentError;
-    
-    if (enrollments && enrollments.length > 0) {
-      // Extract student IDs
-      const studentIds = enrollments.map(e => e.student_id);
+    try {
+      // Get course details
+      const { data: courseData, error: courseError } = await supabase
+        .from('courses')
+        .select('id, code, title, level, semester')
+        .eq('id', courseId)
+        .single();
       
-      // 3. Get student details
-      const { data: studentsData, error: studentsError } = await supabase
-        .from('students')
-        .select('*')
-        .in('student_id', studentIds)
-        .eq('enrollment_status', 'enrolled');
+      if (courseError) throw courseError;
       
-      if (studentsError) throw studentsError;
+      // Get enrolled student IDs for this course
+      const { data: enrollments, error: enrollmentError } = await supabase
+        .from('enrollments')
+        .select('student_id')
+        .eq('course_id', courseId)
+        .eq('status', 'active');
       
-      if (studentsData) {
-        const today = new Date().toISOString().split('T')[0];
+      if (enrollmentError) throw enrollmentError;
+      
+      if (enrollments && enrollments.length > 0) {
+        // Extract student IDs
+        const studentIds = enrollments.map(e => e.student_id);
         
-        // Process each student with attendance data
-        const studentsWithAttendance = await Promise.all(
-          studentsData.map(async (student) => {
-            // Fetch attendance records for today
-            const { data: attendanceRecords } = await supabase
-              .from('student_attendance')
-              .select('*')
-              .eq('student_id', student.student_id)
-              .eq('course_code', courseData.code)
-              .gte('check_in_time', `${today}T00:00:00`)
-              .lte('check_in_time', `${today}T23:59:59`)
-              .order('check_in_time', { ascending: false });
-            
-            return {
-              ...student,
-              attendance_record: attendanceRecords || [],
-              key: student.student_id
-            };
-          })
-        );
+        // Get student details
+        const { data: studentsData, error: studentsError } = await supabase
+          .from('students')
+          .select('*')
+          .in('student_id', studentIds)
+          .eq('enrollment_status', 'enrolled');
         
-        setStudents(studentsWithAttendance);
+        if (studentsError) throw studentsError;
+        
+        if (studentsData) {
+          const today = new Date().toISOString().split('T')[0];
+          
+          // Process each student with attendance data
+          const studentsWithAttendance = await Promise.all(
+            studentsData.map(async (student) => {
+              // Fetch attendance records for today
+              const { data: attendanceRecords } = await supabase
+                .from('student_attendance')
+                .select('*')
+                .eq('student_id', student.student_id)
+                .eq('course_code', courseData.code)
+                .gte('check_in_time', `${today}T00:00:00`)
+                .lte('check_in_time', `${today}T23:59:59`)
+                .order('check_in_time', { ascending: false });
+              
+              return {
+                ...student,
+                attendance_record: attendanceRecords || [],
+                key: student.student_id
+              };
+            })
+          );
+          
+          setStudents(studentsWithAttendance);
+        }
+      } else {
+        // No students enrolled in this course
+        setStudents([]);
       }
-    } else {
-      // No students enrolled in this course
-      setStudents([]);
+      
+    } catch (error: any) {
+      console.error('Error fetching students:', error);
+      message.error('Failed to load students');
+    } finally {
+      setLoading(false);
     }
-    
-  } catch (error: any) {
-    console.error('Error fetching students:', error);
-    message.error('Failed to load students');
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   useEffect(() => {
     fetchCourses();
@@ -148,64 +142,146 @@ const fetchStudents = async (courseId: string) => {
     fetchStudents(courseId);
   };
 
+  const handleAttendanceComplete = async (result: any) => {
+    console.log('Face recognition result:', result);
+    
+    if (result.success && result.student) {
+      try {
+        const today = new Date().toISOString().split('T')[0];
+        
+        // Check if student object has matric_number
+        if (!result.student.matric_number) {
+          console.error('No matric number in result:', result.student);
+          message.error('Student identification failed: No matric number found');
+          return;
+        }
+        
+        const matricNumber = result.student.matric_number;
+        
+        // Get selected course details
+        const selectedCourseData = courses.find(c => c.id === selectedCourse);
+        if (!selectedCourseData) {
+          message.error('Course not found');
+          return;
+        }
+        
+        // Find student by matric_number in our current student list
+        const existingStudent = students.find(s => 
+          s.matric_number === matricNumber
+        );
+        
+        if (!existingStudent) {
+          console.error('Student not found in course list:', matricNumber);
+          message.error(`Student ${result.student.name} (${matricNumber}) not enrolled in this course`);
+          return;
+        }
+        
+        // Use the student_id from our database record
+        const studentId = existingStudent.student_id;
+        const studentName = existingStudent.name;
+        
+        // Check if attendance already exists for today
+        const { data: existingAttendance, error: fetchError } = await supabase
+          .from('student_attendance')
+          .select('id, score')
+          .eq('student_id', studentId)
+          .eq('course_code', selectedCourseData.code)
+          .gte('check_in_time', `${today}T00:00:00`)
+          .lte('check_in_time', `${today}T23:59:59`)
+          .single();
+        
+        // It's okay if no record is found
+        if (fetchError && fetchError.code !== 'PGRST116') {
+          throw fetchError;
+        }
+        
+        if (existingAttendance) {
+          // Update existing attendance
+          const { error } = await supabase
+            .from('student_attendance')
+            .update({
+              check_in_time: new Date().toISOString(),
+              verification_method: 'face_recognition',
+              confidence_score: result.confidence || 0.95,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', existingAttendance.id);
+          
+          if (error) throw error;
+          message.success(`Attendance updated for ${studentName}`);
+        } else {
+          // Create new attendance record
+          const attendanceData = {
+            student_id: studentId,
+            student_name: studentName,
+            matric_number: matricNumber,
+            course_code: selectedCourseData.code,
+            course_title: selectedCourseData.title,
+            level: selectedCourseData.level,
+            attendance_date: today,
+            check_in_time: new Date().toISOString(),
+            status: 'present',
+            verification_method: 'face_recognition',
+            confidence_score: result.confidence || 0.95,
+            score: 2.00,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          };
+          
+          const { error } = await supabase
+            .from('student_attendance')
+            .insert([attendanceData]);
+          
+          if (error) throw error;
+          message.success(`Attendance recorded for ${studentName}`);
+        }
+        
+        // Refresh the student list
+        fetchStudents(selectedCourse);
+        
+      } catch (error: any) {
+        console.error('Attendance error:', error);
+        
+        if (error.code === '42501') {
+          message.error('Permission denied. Please disable RLS on student_attendance table.');
+        } else if (error.code === '42P01') {
+          message.error('Attendance table not created. Please create student_attendance table.');
+        } else {
+          message.error('Failed to save attendance: ' + error.message);
+        }
+      }
+    } else {
+      message.error(`Face recognition failed: ${result.message || 'Unknown error'}`);
+    }
+  };
 
+  const handleManualAttendance = (student: any) => {
+    setSelectedStudent(student);
+    setManualModalVisible(true);
+  };
 
-  
- const handleAttendanceComplete = async (result: any) => {
-  console.log('Attendance result:', result);
-  
-  if (result.success && result.student) {
+  const confirmManualAttendance = async () => {
+    if (!selectedStudent || !selectedCourse) return;
+    
     try {
       const today = new Date().toISOString().split('T')[0];
-      
-      // Debug: Log what face recognition returns
-      console.log('Face recognition result:', result.student);
-      
-      // Check if student object has matric_number
-      if (!result.student.matric_number) {
-        console.error('No matric number in result:', result.student);
-        message.error('Student identification failed: No matric number found');
-        return;
-      }
-      
-      const matricNumber = result.student.matric_number;
-      
-      // Get selected course details
       const selectedCourseData = courses.find(c => c.id === selectedCourse);
+      
       if (!selectedCourseData) {
         message.error('Course not found');
         return;
       }
       
-      // Find student by matric_number in our current student list
-      const existingStudent = students.find(s => 
-        s.matric_number === matricNumber
-      );
-      
-      if (!existingStudent) {
-        console.error('Student not found in course list:', matricNumber);
-        console.error('Available students:', students.map(s => s.matric_number));
-        message.error(`Student ${result.student.name} (${matricNumber}) not enrolled in this course`);
-        return;
-      }
-      
-      // Use the student_id from our database record
-      const studentId = existingStudent.student_id;
-      const studentName = existingStudent.name;
-      
-      console.log('Matched student:', existingStudent);
-      
       // Check if attendance already exists for today
       const { data: existingAttendance, error: fetchError } = await supabase
         .from('student_attendance')
         .select('id, score')
-        .eq('student_id', studentId)
+        .eq('student_id', selectedStudent.student_id)
         .eq('course_code', selectedCourseData.code)
         .gte('check_in_time', `${today}T00:00:00`)
         .lte('check_in_time', `${today}T23:59:59`)
         .single();
       
-      // It's okay if no record is found (PGRST116 is "not found" error)
       if (fetchError && fetchError.code !== 'PGRST116') {
         throw fetchError;
       }
@@ -216,154 +292,57 @@ const fetchStudents = async (courseId: string) => {
           .from('student_attendance')
           .update({
             check_in_time: new Date().toISOString(),
-            verification_method: 'face_recognition',
-            confidence_score: result.confidence || 0.95,
+            verification_method: 'manual',
             updated_at: new Date().toISOString()
           })
           .eq('id', existingAttendance.id);
         
         if (error) throw error;
-        message.success(`Attendance updated for ${studentName}`);
+        message.success(`Attendance updated for ${selectedStudent.name}`);
       } else {
         // Create new attendance record
         const attendanceData = {
-          student_id: studentId,
-          student_name: studentName,
-          matric_number: matricNumber,
+          student_id: selectedStudent.student_id,
+          student_name: selectedStudent.name,
+          matric_number: selectedStudent.matric_number,
           course_code: selectedCourseData.code,
           course_title: selectedCourseData.title,
           level: selectedCourseData.level,
           attendance_date: today,
           check_in_time: new Date().toISOString(),
           status: 'present',
-          verification_method: 'face_recognition',
-          confidence_score: result.confidence || 0.95,
+          verification_method: 'manual',
           score: 2.00,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         };
         
-        console.log('Inserting attendance:', attendanceData);
-        
         const { error } = await supabase
           .from('student_attendance')
           .insert([attendanceData]);
         
-        if (error) {
-          console.error('Insert error:', error);
-          throw error;
-        }
-        message.success(`Attendance recorded for ${studentName}`);
+        if (error) throw error;
+        message.success(`Manual attendance recorded for ${selectedStudent.name}`);
       }
       
       // Refresh the student list
       fetchStudents(selectedCourse);
       
     } catch (error: any) {
-      console.error('Attendance error details:', error);
+      console.error('Manual attendance error:', error);
       
-      if (error.code === '42P01') {
-        message.error('Attendance table not created. Please run SQL to create student_attendance table.');
-      } else if (error.message.includes('student_attendance')) {
-        message.error('Database error with attendance table.');
+      if (error.code === '42501') {
+        message.error('RLS policy violation. Please run: ALTER TABLE student_attendance DISABLE ROW LEVEL SECURITY;');
+      } else if (error.code === '42P01') {
+        message.error('Table does not exist. Please create student_attendance table.');
       } else {
-        message.error('Failed to save attendance: ' + error.message);
+        message.error('Failed to record manual attendance: ' + error.message);
       }
     }
-  } else {
-    console.error('Face recognition failed:', result);
-    message.error(`Face recognition failed: ${result.message || 'Unknown error'}`);
-  }
-};
-
-  const handleManualAttendance = (student: any) => {
-    setSelectedStudent(student);
-    setManualModalVisible(true);
+    
+    setManualModalVisible(false);
+    setSelectedStudent(null);
   };
-
-  const confirmManualAttendance = async () => {
-  if (!selectedStudent || !selectedCourse) return;
-  
-  try {
-    const today = new Date().toISOString().split('T')[0];
-    const selectedCourseData = courses.find(c => c.id === selectedCourse);
-    
-    if (!selectedCourseData) {
-      message.error('Course not found');
-      return;
-    }
-    
-    // Check if attendance already exists for today
-    const { data: existingAttendance, error: fetchError } = await supabase
-      .from('student_attendance')
-      .select('id, score')
-      .eq('student_id', selectedStudent.student_id)
-      .eq('course_code', selectedCourseData.code)
-      .gte('check_in_time', `${today}T00:00:00`)
-      .lte('check_in_time', `${today}T23:59:59`)
-      .single();
-    
-    if (fetchError && fetchError.code !== 'PGRST116') {
-      throw fetchError;
-    }
-    
-    if (existingAttendance) {
-      // Update existing attendance
-      const { error } = await supabase
-        .from('student_attendance')
-        .update({
-          check_in_time: new Date().toISOString(),
-          verification_method: 'manual',
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', existingAttendance.id);
-      
-      if (error) throw error;
-      message.success(`Attendance updated for ${selectedStudent.name}`);
-    } else {
-      // Create new attendance record
-      const attendanceData = {
-        student_id: selectedStudent.student_id,
-        student_name: selectedStudent.name,
-        matric_number: selectedStudent.matric_number, // Use matric_number
-        course_code: selectedCourseData.code,
-        course_title: selectedCourseData.title,
-        level: selectedCourseData.level,
-        attendance_date: today,
-        check_in_time: new Date().toISOString(),
-        status: 'present',
-        verification_method: 'manual',
-        score: 2.00,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      };
-      
-      console.log('Manual attendance data:', attendanceData);
-      
-      const { error } = await supabase
-        .from('student_attendance')
-        .insert([attendanceData]);
-      
-      if (error) throw error;
-      message.success(`Manual attendance recorded for ${selectedStudent.name}`);
-    }
-    
-    // Refresh the student list
-    fetchStudents(selectedCourse);
-    
-  } catch (error: any) {
-    console.error('Manual attendance error:', error);
-    
-    if (error.code === '42P01') {
-      message.error('Please create the student_attendance table first. Run SQL: CREATE TABLE student_attendance...');
-    } else {
-      message.error('Failed to record manual attendance: ' + error.message);
-    }
-  }
-  
-  setManualModalVisible(false);
-  setSelectedStudent(null);
-};
 
   const updateStudentScore = (student: any) => {
     setSelectedStudent(student);
@@ -379,7 +358,7 @@ const fetchStudents = async (courseId: string) => {
     }
     
     const score = scoreInputValue;
-    const maxScore = attendanceSession?.max_score || 2.00;
+    const maxScore = 2.00;
     
     if (score < 0 || score > maxScore) {
       message.error(`Invalid score. Must be between 0 and ${maxScore}`);
@@ -396,7 +375,7 @@ const fetchStudents = async (courseId: string) => {
       }
       
       // Check if attendance record exists for today
-      const { data: existingAttendance } = await supabase
+      const { data: existingAttendance, error: fetchError } = await supabase
         .from('student_attendance')
         .select('id')
         .eq('student_id', selectedStudent.student_id)
@@ -404,6 +383,10 @@ const fetchStudents = async (courseId: string) => {
         .gte('check_in_time', `${today}T00:00:00`)
         .lte('check_in_time', `${today}T23:59:59`)
         .single();
+      
+      if (fetchError && fetchError.code !== 'PGRST116') {
+        throw fetchError;
+      }
       
       if (existingAttendance) {
         // Update existing record score
@@ -453,36 +436,6 @@ const fetchStudents = async (courseId: string) => {
       setScoreInputValue(0);
     }
   };
-
-
-const checkAttendanceTable = async () => {
-  try {
-    // Simple query to check if table exists
-    const { error } = await supabase
-      .from('student_attendance')
-      .select('count', { count: 'exact', head: true })
-      .limit(1);
-    
-    if (error && error.code === '42P01') {
-      return false; // Table doesn't exist
-    }
-    return true; // Table exists
-  } catch (error) {
-    console.error('Table check error:', error);
-    return false;
-  }
-};
-
-// Then in your component, add a useEffect to check on load
-useEffect(() => {
-  const checkTable = async () => {
-    const tableExists = await checkAttendanceTable();
-    if (!tableExists) {
-      message.warning('Attendance table not found. Please create it in Supabase.');
-    }
-  };
-  checkTable();
-}, []);
 
   const handleMarkAllPresent = async () => {
     if (!selectedCourse || students.length === 0) return;
@@ -629,84 +582,106 @@ useEffect(() => {
     <div style={{ padding: '20px' }}>
       <Title level={2}>Take Attendance</Title>
       
+      {/* Show instructions if table doesn't exist */}
+      {selectedCourse && (
+        <Alert
+          message="Important Instructions"
+          description={
+            <div>
+              <p>Before using attendance features:</p>
+              <ol>
+                <li>Run this SQL in Supabase to disable RLS:
+                  <pre style={{ background: '#f5f5f5', padding: '8px', borderRadius: '4px', marginTop: '4px' }}>
+                    ALTER TABLE student_attendance DISABLE ROW LEVEL SECURITY;
+                  </pre>
+                </li>
+                <li>Ensure FaceCamera component returns <code>matric_number</code> in student object</li>
+              </ol>
+            </div>
+          }
+          type="warning"
+          showIcon
+          style={{ marginBottom: 20 }}
+        />
+      )}
+      
       <Card style={{ marginBottom: 20 }}>
         <Row gutter={[16, 16]} align="middle">
           <Col span={8}>
             <Text strong>Select Course:</Text>
-           <Select
-  style={{ 
-    width: '100%', 
-    marginTop: 8,
-    fontSize: isMobile ? '14px' : '16px'
-  }}
-  placeholder="Choose a course"
-  value={selectedCourse}
-  onChange={handleCourseSelect}
-  loading={loading}
-  popupMatchSelectWidth={false}
-  size="large"
-  showSearch={{
-    filterOption: (input, option) => {
-      const course = courses.find(c => c.id === option?.value);
-      if (!course) return false;
-      
-      const searchText = input.toLowerCase();
-      return (
-        course.code.toLowerCase().includes(searchText) ||
-        course.title.toLowerCase().includes(searchText) ||
-        course.level.toString().includes(input)
-      );
-    }
-  }}
-  // Try all possible props for maximum compatibility
-  {...(isMobile ? {
-    dropdownStyle: { maxHeight: '70vh' },
-    popupStyle: { maxHeight: '70vh' },
-    className: "mobile-select-popup"
-  } : {
-    dropdownStyle: { maxHeight: '400px' },
-    popupStyle: { maxHeight: '400px' }
-  })}
->
-  {courses.map(course => (
-    <Select.Option 
-      key={course.id} 
-      value={course.id}
-      label={`${course.code} ${course.title} ${course.level}`}
-    >
-      <div style={{ padding: '8px 0' }}>
-        <div style={{ 
-          display: 'flex', 
-          justifyContent: 'space-between',
-          marginBottom: 4 
-        }}>
-          <strong style={{ color: '#1890ff' }}>{course.code}</strong>
-          <span style={{ 
-            fontSize: isMobile ? '11px' : '12px', 
-            background: course.level === 100 ? '#e6f7ff' : 
-                       course.level === 200 ? '#f6ffed' : 
-                       course.level === 300 ? '#fff7e6' : '#fff1f0',
-            color: course.level === 100 ? '#1890ff' : 
-                   course.level === 200 ? '#52c41a' : 
-                   course.level === 300 ? '#fa8c16' : '#f5222d',
-            padding: '2px 6px', 
-            borderRadius: 4,
-            fontWeight: 'bold'
-          }}>
-            L{course.level}
-          </span>
-        </div>
-        <div style={{ 
-          fontSize: isMobile ? '13px' : '14px', 
-          color: '#333',
-          marginBottom: 4
-        }}>
-          {course.title}
-        </div>
-      </div>
-    </Select.Option>
-  ))}
-</Select>
+            <Select
+              style={{ 
+                width: '100%', 
+                marginTop: 8,
+                fontSize: isMobile ? '14px' : '16px'
+              }}
+              placeholder="Choose a course"
+              value={selectedCourse}
+              onChange={handleCourseSelect}
+              loading={loading}
+              popupMatchSelectWidth={false}
+              size="large"
+              showSearch={{
+                filterOption: (input, option) => {
+                  const course = courses.find(c => c.id === option?.value);
+                  if (!course) return false;
+                  
+                  const searchText = input.toLowerCase();
+                  return (
+                    course.code.toLowerCase().includes(searchText) ||
+                    course.title.toLowerCase().includes(searchText) ||
+                    course.level.toString().includes(input)
+                  );
+                }
+              }}
+              {...(isMobile ? {
+                dropdownStyle: { maxHeight: '70vh' },
+                popupStyle: { maxHeight: '70vh' },
+                className: "mobile-select-popup"
+              } : {
+                dropdownStyle: { maxHeight: '400px' },
+                popupStyle: { maxHeight: '400px' }
+              })}
+            >
+              {courses.map(course => (
+                <Select.Option 
+                  key={course.id} 
+                  value={course.id}
+                  label={`${course.code} ${course.title} ${course.level}`}
+                >
+                  <div style={{ padding: '8px 0' }}>
+                    <div style={{ 
+                      display: 'flex', 
+                      justifyContent: 'space-between',
+                      marginBottom: 4 
+                    }}>
+                      <strong style={{ color: '#1890ff' }}>{course.code}</strong>
+                      <span style={{ 
+                        fontSize: isMobile ? '11px' : '12px', 
+                        background: course.level === 100 ? '#e6f7ff' : 
+                                   course.level === 200 ? '#f6ffed' : 
+                                   course.level === 300 ? '#fff7e6' : '#fff1f0',
+                        color: course.level === 100 ? '#1890ff' : 
+                               course.level === 200 ? '#52c41a' : 
+                               course.level === 300 ? '#fa8c16' : '#f5222d',
+                        padding: '2px 6px', 
+                        borderRadius: 4,
+                        fontWeight: 'bold'
+                      }}>
+                        L{course.level}
+                      </span>
+                    </div>
+                    <div style={{ 
+                      fontSize: isMobile ? '13px' : '14px', 
+                      color: '#333',
+                      marginBottom: 4
+                    }}>
+                      {course.title}
+                    </div>
+                  </div>
+                </Select.Option>
+              ))}
+            </Select>
           </Col>
           
           <Col span={8}>
