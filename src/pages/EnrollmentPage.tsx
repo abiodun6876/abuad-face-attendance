@@ -1,4 +1,4 @@
-// src/pages/EnrollmentPage.tsx - WITH PROGRAM AND ACADEMIC SESSION FETCHING
+// src/pages/EnrollmentPage.tsx - SIMPLIFIED VERSION FOR ATTENDANCE
 import React, { useState, useEffect } from 'react';
 import { 
   Card, 
@@ -17,7 +17,7 @@ import {
   Input as AntdInput,
   Spin
 } from 'antd';
-import { Camera, User, BookOpen, CheckCircle, Mail, Phone, GraduationCap, Calendar } from 'lucide-react';
+import { Camera, User, BookOpen, CheckCircle, GraduationCap, Calendar } from 'lucide-react';
 import FaceCamera from '../components/FaceCamera';
 import { supabase } from '../lib/supabase';
 
@@ -80,10 +80,15 @@ const EnrollmentPage: React.FC = () => {
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [matricNumber, setMatricNumber] = useState<string>('');
   
-  // State for fetched data
+  // State for fetched data - SIMPLIFIED
   const [programs, setPrograms] = useState<any[]>([]);
-  const [academicSessions, setAcademicSessions] = useState<any[]>([]);
-  const [fetchingData, setFetchingData] = useState(false);
+  const [levels, setLevels] = useState([
+    { value: 100, label: '100 Level' },
+    { value: 200, label: '200 Level' },
+    { value: 300, label: '300 Level' },
+    { value: 400, label: '400 Level' },
+    { value: 500, label: '500 Level' },
+  ]);
 
   const generateMatricNumber = () => {
     const currentYear = new Date().getFullYear();
@@ -91,9 +96,8 @@ const EnrollmentPage: React.FC = () => {
     return `ABU/${currentYear}/${randomNum}`;
   };
 
-  // Fetch programs and academic sessions
-  const fetchProgramsAndSessions = async () => {
-    setFetchingData(true);
+  // Fetch programs only
+  const fetchPrograms = async () => {
     try {
       // Fetch programs
       const { data: programsData, error: programsError } = await supabase
@@ -105,28 +109,18 @@ const EnrollmentPage: React.FC = () => {
       if (programsError) throw programsError;
       setPrograms(programsData || []);
 
-      // Fetch academic sessions (last 5 years and next 1 year)
-      const currentYear = new Date().getFullYear();
-      const { data: sessionsData, error: sessionsError } = await supabase
-        .from('academic_sessions')
-        .select('id, code, name, session_year, is_current')
-        .eq('is_active', true)
-        .order('session_year', { ascending: false })
-        .limit(10);
-
-      if (sessionsError) throw sessionsError;
-      setAcademicSessions(sessionsData || []);
-
-      console.log('Fetched:', {
-        programs: programsData?.length || 0,
-        sessions: sessionsData?.length || 0
-      });
+      console.log('Fetched programs:', programsData?.length || 0);
 
     } catch (error: any) {
       console.error('Error fetching data:', error);
-      message.error('Failed to load program and session data');
-    } finally {
-      setFetchingData(false);
+      // If programs table doesn't exist, use default options
+      message.warning('Programs not loaded. Using default options.');
+      setPrograms([
+        { id: '1', code: 'CSC', name: 'Computer Science', short_name: 'CS' },
+        { id: '2', code: 'EEE', name: 'Electrical Engineering', short_name: 'EE' },
+        { id: '3', code: 'MED', name: 'Medicine', short_name: 'MD' },
+        { id: '4', code: 'LAW', name: 'Law', short_name: 'LW' },
+      ]);
     }
   };
 
@@ -136,13 +130,9 @@ const EnrollmentPage: React.FC = () => {
     setMatricNumber(newMatric);
     form.setFieldValue('matric_number', newMatric);
     
-    // Fetch programs and sessions
-    fetchProgramsAndSessions();
+    // Fetch programs
+    fetchPrograms();
   }, [form]);
-
-  useEffect(() => {
-    console.log('studentData updated:', studentData);
-  }, [studentData]);
 
   const handleNext = async () => {
     try {
@@ -225,18 +215,16 @@ const EnrollmentPage: React.FC = () => {
           ? programs.find(p => p.id === studentData.program_id)
           : null;
 
-        // Find selected session details
-        const selectedSession = studentData.academic_session_id
-          ? academicSessions.find(s => s.id === studentData.academic_session_id)
-          : null;
+        // Get current academic year
+        const currentYear = new Date().getFullYear();
+        const academicSession = `${currentYear}/${currentYear + 1}`;
 
-        // Prepare student data
+        // Prepare student data - SIMPLIFIED for attendance
         const studentRecord: any = {
           student_id: studentId,
           name: studentName,
           matric_number: studentId,
-          email: studentData.email?.trim() || null,
-          phone: studentData.phone?.trim() || null,
+          // Removed email and phone as they're not needed for attendance
           gender: studentData.gender || 'male',
           enrollment_status: 'enrolled',
           face_match_threshold: 0.7,
@@ -244,21 +232,21 @@ const EnrollmentPage: React.FC = () => {
           updated_at: new Date().toISOString()
         };
 
-        // Add academic fields
-        if (studentData.level) studentRecord.level = studentData.level;
-        if (studentData.semester) studentRecord.semester = studentData.semester;
-        if (selectedSession) {
-          studentRecord.academic_session_id = selectedSession.id;
-          studentRecord.academic_session = selectedSession.name;
-          studentRecord.year_of_entry = selectedSession.session_year;
+        // Add academic fields - ESSENTIAL for attendance
+        if (studentData.level) {
+          studentRecord.level = parseInt(studentData.level);
         }
         if (selectedProgram) {
           studentRecord.program_id = selectedProgram.id;
           studentRecord.program = selectedProgram.name;
           studentRecord.program_name = selectedProgram.name;
+          studentRecord.program_code = selectedProgram.code;
         }
+        // Add academic session
+        studentRecord.academic_session = academicSession;
+        studentRecord.year_of_entry = currentYear;
 
-        // Handle face data
+        // Handle face data - ESSENTIAL for attendance
         if (result.embedding && result.embedding.length > 0) {
           console.log('Saving face embedding with length:', result.embedding.length);
           
@@ -279,13 +267,12 @@ const EnrollmentPage: React.FC = () => {
           studentRecord.face_enrolled_at = new Date().toISOString();
         }
 
-        console.log('Saving student record with face data:', {
+        console.log('Saving student record:', {
           name: studentRecord.name,
+          level: studentRecord.level,
           program: selectedProgram?.name,
-          session: selectedSession?.name,
-          hasEmbedding: !!studentRecord.face_embedding,
-          embeddingLength: studentRecord.face_embedding?.length || 0,
-          hasPhoto: !!studentRecord.photo_url
+          academic_session: studentRecord.academic_session,
+          hasFaceData: !!studentRecord.face_embedding || !!studentRecord.photo_url
         });
 
         // Save to database
@@ -339,8 +326,9 @@ const EnrollmentPage: React.FC = () => {
             faceCaptured: !!result.embedding,
             photoCaptured: !!result.photoUrl,
             localStorageSaved: !!result.photoUrl,
-            program: selectedProgram?.name,
-            session: selectedSession?.name
+            program: selectedProgram?.name || 'Not specified',
+            level: studentRecord.level,
+            academic_session: academicSession
           });
         }
 
@@ -460,37 +448,11 @@ const EnrollmentPage: React.FC = () => {
             </Row>
 
             <Row gutter={[16, 16]}>
-              <Col span={24} md={12}>
-                <Form.Item
-                  label="Email"
-                  name="email"
-                  rules={[{ type: 'email', message: 'Please enter valid email' }]}
-                >
-                  <Input 
-                    placeholder="student@abuad.edu.ng" 
-                    prefix={<Mail size={16} />}
-                    size="large"
-                  />
-                </Form.Item>
-              </Col>
-              <Col span={24} md={12}>
-                <Form.Item label="Phone Number" name="phone">
-                  <Input 
-                    placeholder="+2348000000000" 
-                    prefix={<Phone size={16} />}
-                    size="large"
-                  />
-                </Form.Item>
-              </Col>
-            </Row>
-
-            <Row gutter={[16, 16]}>
               <Col span={24}>
                 <Form.Item label="Gender" name="gender">
                   <Select placeholder="Select gender" size="large">
                     <Select.Option value="male">Male</Select.Option>
                     <Select.Option value="female">Female</Select.Option>
-                    <Select.Option value="other">Other</Select.Option>
                   </Select>
                 </Form.Item>
               </Col>
@@ -506,71 +468,42 @@ const EnrollmentPage: React.FC = () => {
         <div style={{ maxWidth: 600, margin: '0 auto' }}>
           <Alert
             message="Academic Information"
-            description="Select the student's academic program and session"
+            description="Select the student's academic program and level (Required for attendance tracking)"
             type="info"
             showIcon
             style={{ marginBottom: 20 }}
           />
           
-          {fetchingData ? (
+          {programs.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '40px 0' }}>
               <Spin size="large" />
               <Text style={{ display: 'block', marginTop: 16 }}>
-                Loading academic data...
+                Loading programs...
               </Text>
             </div>
           ) : (
             <Form
               form={academicForm}
               layout="vertical"
-              initialValues={{ level: 100, semester: 1 }}
+              initialValues={{ level: 100 }}
             >
-              <Row gutter={[16, 16]}>
-                <Col span={12}>
-                  <Form.Item label="Level" name="level">
-                    <Select placeholder="Select level" size="large">
-                      <Select.Option value={100}>100 Level</Select.Option>
-                      <Select.Option value={200}>200 Level</Select.Option>
-                      <Select.Option value={300}>300 Level</Select.Option>
-                      <Select.Option value={400}>400 Level</Select.Option>
-                      <Select.Option value={500}>500 Level</Select.Option>
-                    </Select>
-                  </Form.Item>
-                </Col>
-                <Col span={12}>
-                  <Form.Item label="Semester" name="semester">
-                    <Select placeholder="Select semester" size="large">
-                      <Select.Option value={1}>First Semester</Select.Option>
-                      <Select.Option value={2}>Second Semester</Select.Option>
-                    </Select>
-                  </Form.Item>
-                </Col>
-              </Row>
-
               <Row gutter={[16, 16]}>
                 <Col span={24}>
                   <Form.Item 
-                    label="Academic Session *" 
-                    name="academic_session_id"
-                    rules={[{ required: true, message: 'Please select academic session' }]}
+                    label="Level *" 
+                    name="level"
+                    rules={[{ required: true, message: 'Please select level' }]}
+                    help="Required for course filtering in attendance"
                   >
                     <Select 
-                      placeholder="Select academic session" 
+                      placeholder="Select level" 
                       size="large"
-                      showSearch
-                      filterOption={(input, option) =>
-                        (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
-                      }
-                      options={academicSessions.map(session => ({
-                        value: session.id,
-                        label: `${session.name} (${session.session_year})`,
-                        session: session
+                      options={levels.map(level => ({
+                        value: level.value,
+                        label: level.label
                       }))}
                     />
                   </Form.Item>
-                  <Text type="secondary" style={{ marginTop: -8, display: 'block' }}>
-                    Select the academic year/session
-                  </Text>
                 </Col>
               </Row>
 
@@ -580,6 +513,7 @@ const EnrollmentPage: React.FC = () => {
                     label="Program *" 
                     name="program_id"
                     rules={[{ required: true, message: 'Please select program' }]}
+                    help="Required for attendance reporting"
                   >
                     <Select 
                       placeholder="Select program" 
@@ -591,20 +525,19 @@ const EnrollmentPage: React.FC = () => {
                       options={programs.map(program => ({
                         value: program.id,
                         label: `${program.code} - ${program.name}${program.short_name ? ` (${program.short_name})` : ''}`,
-                        program: program
                       }))}
                     />
                   </Form.Item>
-                  <Text type="secondary" style={{ marginTop: -8, display: 'block' }}>
-                    Select the academic program/degree
-                  </Text>
                 </Col>
               </Row>
 
               <div style={{ marginTop: 30, textAlign: 'center' }}>
-                <Text type="secondary">
-                  Note: Faculty and department information can be added later from the student management page.
-                </Text>
+                <Alert
+                  type="warning"
+                  message="Important for Attendance"
+                  description="Level and Program information are required for attendance tracking and reporting. These cannot be changed easily after enrollment."
+                  showIcon
+                />
               </div>
             </Form>
           )}
@@ -636,11 +569,13 @@ const EnrollmentPage: React.FC = () => {
                     {enrollmentResult.student?.matric_number}
                   </Tag>
                 </p>
-                {enrollmentResult.student?.email && (
-                  <p><strong>Email:</strong> {enrollmentResult.student.email}</p>
-                )}
-                <p><strong>Program:</strong> {enrollmentResult.program || 'Not specified'}</p>
-                <p><strong>Academic Session:</strong> {enrollmentResult.session || 'Not specified'}</p>
+                <p><strong>Level:</strong> 
+                  <Tag color="purple" style={{ marginLeft: 8 }}>
+                    Level {enrollmentResult.level}
+                  </Tag>
+                </p>
+                <p><strong>Program:</strong> {enrollmentResult.program}</p>
+                <p><strong>Academic Session:</strong> {enrollmentResult.academic_session}</p>
                 <p><strong>Status:</strong> <Tag color="success">Enrolled</Tag></p>
                 <p><strong>Face Data:</strong> 
                   <Tag color={enrollmentResult?.faceCaptured ? "green" : "orange"} style={{ marginLeft: 8 }}>
@@ -702,8 +637,7 @@ const EnrollmentPage: React.FC = () => {
                 
                 // Reset academic form
                 academicForm.setFieldsValue({
-                  level: 100,
-                  semester: 1
+                  level: 100
                 });
               }}
             >
@@ -719,7 +653,7 @@ const EnrollmentPage: React.FC = () => {
                 </Button>
                 <Button 
                   size="large"
-                  type="default"
+                  type="primary"
                   onClick={() => window.location.href = '/attendance'}
                 >
                   Take Attendance
@@ -757,20 +691,18 @@ const EnrollmentPage: React.FC = () => {
                   <Tag color="orange">Pending Face Enrollment</Tag>
                 </Col>
               </Row>
-              {studentData.program_id && (
+              {studentData.level && (
                 <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
+                  <Col span={12}>
+                    <Text strong>Level: </Text>
+                    <br />
+                    <Tag color="purple">Level {studentData.level}</Tag>
+                  </Col>
                   <Col span={12}>
                     <Text strong>Program: </Text>
                     <br />
                     <Text>
                       {programs.find(p => p.id === studentData.program_id)?.name || 'Not selected'}
-                    </Text>
-                  </Col>
-                  <Col span={12}>
-                    <Text strong>Session: </Text>
-                    <br />
-                    <Text>
-                      {academicSessions.find(s => s.id === studentData.academic_session_id)?.name || 'Not selected'}
                     </Text>
                   </Col>
                 </Row>
@@ -805,26 +737,11 @@ const EnrollmentPage: React.FC = () => {
                 
                 <div style={{ marginTop: 20 }}>
                   <Alert
-                    type="info"
-                    message="Testing Note"
-                    description="If face recognition models are not loading, you can still save the student with just a photo. Images will be saved to both database and local storage."
+                    type="warning"
+                    message="Important for Attendance"
+                    description="Face data is required for biometric attendance marking. Please ensure good lighting."
                     style={{ marginBottom: 20 }}
                   />
-                  
-                  <Button 
-                    type="default"
-                    onClick={() => {
-                      // Test enrollment with simulated data
-                      handleEnrollmentComplete({
-                        success: true,
-                        message: 'Test enrollment successful',
-                        embedding: new Array(128).fill(0.1), // Simulated embedding
-                        photoUrl: 'data:image/jpeg;base64,test-photo-base64'
-                      });
-                    }}
-                  >
-                    Test Enrollment
-                  </Button>
                   
                   <div style={{ marginTop: 20 }}>
                     <Button onClick={handleBack}>
@@ -874,8 +791,7 @@ const EnrollmentPage: React.FC = () => {
                 type="primary" 
                 onClick={currentStep === 1 ? handleAcademicSubmit : handleNext} 
                 size="large"
-                loading={loading || fetchingData}
-                disabled={fetchingData}
+                loading={loading}
               >
                 {currentStep === 1 ? 'Proceed to Face Enrollment' : 'Next'}
               </Button>

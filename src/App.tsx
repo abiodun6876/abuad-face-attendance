@@ -27,15 +27,9 @@ import EnrollmentPage from './pages/EnrollmentPage';
 import AttendancePage from './pages/AttendancePage';
 import Dashboard from './pages/Dashboard';
 import ImageManagementPage from './pages/ImageManagementPage';
-import SyncPage from './pages/SyncPage';
 import PWAInstallPrompt from './components/PWAInstallPrompt';
-import CourseRegistrationPage from './pages/CourseRegistrationPage';
-import LecturerAttendancePage from './pages/LecturerAttendancePage';
-
 import { supabase } from './lib/supabase';
 import './App.css';
-import CourseManagementPage from './pages/CourseManagement';
-
 
 const { Header, Sider, Content, Footer } = Layout;
 const { Title, Text } = Typography;
@@ -65,43 +59,13 @@ const menuItems = [
     icon: React.createElement(Camera, { size: 16 }),
     label: <Link to="/attendance">Take Attendance</Link>,
   },
-  {
-    key: '4',
-    icon: React.createElement(Users, { size: 16 }),
-    label: <Link to="/students">Student Management</Link>,
-  },
-  {
-    key: '5',
-    icon: React.createElement(Calendar, { size: 16 }),
-    label: <Link to="/events">Event Management</Link>,
-  },
+
   {
     key: '6',
     icon: React.createElement(Database, { size: 16 }),
     label: <Link to="/sync">Sync Data</Link>,
   },
-  {
-    key: '7',
-    icon: React.createElement(Settings, { size: 16 }),
-    label: <Link to="/settings">Settings</Link>,
-  },
-  // Add to menu items:
-{
-  key: 'courses',
-  icon: React.createElement(Book, { size: 17 }),
-  label: <Link to="/courses">Course Management</Link>,
-},
 
-{
-  key: 'course-reg',
-  icon: React.createElement(Book, { size: 18 }),
-  label: <Link to="/course-registration">Course Registration</Link>,
-},
-{
-  key: 'lecturer-attendance',
-  icon: React.createElement(Camera, { size: 19 }),
-  label: <Link to="/lecturer-attendance">Take Attendance (Lecturer)</Link>,
-},
 
 ];
 
@@ -129,46 +93,7 @@ const HomeCards = () => {
       path: '/attendance',
       color: '#52c41a',
     },
-    {
-      key: 'students',
-      title: 'Student Management',
-      description: 'View and manage enrolled students',
-      icon: <Users size={isMobile ? 24 : 32} />,
-      path: '/students',
-      color: '#722ed1',
-    },
-    {
-      key: 'courses',
-      title: 'Course Management',
-      description: 'Manage courses and academic sessions',
-      icon: <Book size={isMobile ? 24 : 32} />,
-      path: '/courses',
-      color: '#8B4513', // Brown color for courses
-    },
-    {
-      key: 'course-registration',
-      title: 'Course Registration',
-      description: 'Register students for courses',
-      icon: <UserPlus size={isMobile ? 24 : 32} />,
-      path: '/course-registration',
-      color: '#800080', // Purple color
-    },
-    {
-      key: 'lecturer-attendance',
-      title: 'Lecturer Attendance',
-      description: 'Take attendance as lecturer',
-      icon: <Camera size={isMobile ? 24 : 32} />,
-      path: '/lecturer-attendance',
-      color: '#DAA520', // Goldenrod color
-    },
-    {
-      key: 'events',
-      title: 'Event Management',
-      description: 'Schedule classes and events',
-      icon: <Calendar size={isMobile ? 24 : 32} />,
-      path: '/events',
-      color: '#fa8c16',
-    },
+   
     {
       key: 'sync',
       title: 'Sync Data',
@@ -176,30 +101,6 @@ const HomeCards = () => {
       icon: <Database size={isMobile ? 24 : 32} />,
       path: '/sync',
       color: '#f5222d',
-    },
-    {
-      key: 'dashboard',
-      title: 'Analytics Dashboard',
-      description: 'View attendance statistics and reports',
-      icon: <BarChart size={isMobile ? 24 : 32} />,
-      path: '/',
-      color: '#13c2c2',
-    },
-    {
-      key: 'import',
-      title: 'Import Students',
-      description: 'Bulk import student data',
-      icon: <Upload size={isMobile ? 24 : 32} />,
-      path: '/import',
-      color: '#eb2f96',
-    },
-    {
-      key: 'export',
-      title: 'Export Reports',
-      description: 'Download attendance reports',
-      icon: <Download size={isMobile ? 24 : 32} />,
-      path: '/export',
-      color: '#faad14',
     },
   ];
 
@@ -648,66 +549,10 @@ npm start
                       <Route path="/images" element={<ImageManagementPage />} />
                       <Route path="/enroll" element={<EnrollmentPage />} />
                       <Route path="/attendance" element={<AttendancePage />} />
-                      <Route path="/students" element={
-                        <div style={{ textAlign: 'center', padding: '40px 20px' }}>
-                          <Users size={48} style={{ opacity: 0.3, marginBottom: 20 }} />
-                          <Title level={4}>Student Management</Title>
-                          <Text type="secondary">Coming Soon - View and manage all enrolled students</Text>
-                          <div style={{ marginTop: 20 }}>
-                            <Button type="primary" onClick={() => window.location.href = '/enroll'}>
-                              Enroll New Students
-                            </Button>
-                          </div>
-                        </div>
-                      } />
-                      <Route path="/events" element={
-                        <div style={{ textAlign: 'center', padding: '40px 20px' }}>
-                          <Calendar size={48} style={{ opacity: 0.3, marginBottom: 20 }} />
-                          <Title level={4}>Event Management</Title>
-                          <Text type="secondary">Coming Soon - Schedule classes and events</Text>
-                          <div style={{ marginTop: 20 }}>
-                            <Button type="primary" onClick={() => window.location.href = '/attendance'}>
-                              Take Attendance Now
-                            </Button>
-                          </div>
-                        </div>
-                      } />
-                      <Route path="/sync" element={<SyncPage />} />
-                      <Route path="/settings" element={
-                        <div style={{ textAlign: 'center', padding: '40px 20px' }}>
-                          <Settings size={48} style={{ opacity: 0.3, marginBottom: 20 }} />
-                          <Title level={4}>System Settings</Title>
-                          <Text type="secondary">Coming Soon - Configure system preferences</Text>
-                        </div>
-                      } />
-                      <Route path="/import" element={
-                        <div style={{ textAlign: 'center', padding: '40px 20px' }}>
-                          <Upload size={48} style={{ opacity: 0.3, marginBottom: 20 }} />
-                          <Title level={4}>Import Students</Title>
-                          <Text type="secondary">Coming Soon - Bulk import student data from CSV</Text>
-                          <div style={{ marginTop: 20 }}>
-                            <Button type="primary" onClick={() => window.location.href = '/enroll'}>
-                              Enroll Single Student
-                            </Button>
-                          </div>
-                        </div>
-                      } />
-                    
-<Route path="/course-registration" element={<CourseRegistrationPage />} />
-<Route path="/lecturer-attendance" element={<LecturerAttendancePage />} />
-<Route path="/courses" element={<CourseManagementPage />} />
-                      <Route path="/export" element={
-                        <div style={{ textAlign: 'center', padding: '40px 20px' }}>
-                          <Download size={48} style={{ opacity: 0.3, marginBottom: 20 }} />
-                          <Title level={4}>Export Reports</Title>
-                          <Text type="secondary">Coming Soon - Download attendance reports</Text>
-                          <div style={{ marginTop: 20 }}>
-                            <Button type="primary" onClick={() => window.location.href = '/attendance'}>
-                              View Attendance Records
-                            </Button>
-                          </div>
-                        </div>
-                      } />
+                      
+                      
+                      
+                      
                       <Route path="*" element={<Navigate to="/" />} />
                     </Routes>
                     {/* PWA Install Prompt shows when logged in */}
