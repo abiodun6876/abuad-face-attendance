@@ -21,9 +21,10 @@ import {
   Progress,
   Badge,
   Divider,
-  Descriptions
+  Descriptions,
+  Image
 } from 'antd';
-import { Camera, Calendar, CheckCircle, XCircle, Users } from 'lucide-react';
+import { Camera, Calendar, CheckCircle, XCircle, Users, User } from 'lucide-react'; // Added User icon
 import FaceCamera from '../components/FaceCamera';
 import { supabase } from '../lib/supabase';
 import dayjs from 'dayjs';
@@ -57,6 +58,7 @@ const AttendancePage: React.FC = () => {
   const [faceResult, setFaceResult] = useState<any>(null);
   const [isCapturing, setIsCapturing] = useState(false);
   const [captureStatus, setCaptureStatus] = useState<string>('Ready to capture');
+  const [matchedStudentData, setMatchedStudentData] = useState<any>(null);
 
   // Fetch all courses
   const fetchCourses = async () => {
@@ -127,7 +129,82 @@ const AttendancePage: React.FC = () => {
     }
   };
 
-  // Handle face recognition result
+  // ADD THIS MISSING FUNCTION - Record Attendance
+  const recordAttendance = async (studentData: any, result: any) => {
+    try {
+      const attendanceDate = selectedDate;
+      const studentId = studentData.student_id;
+      const studentName = studentData.name;
+      const matricNumber = studentData.matric_number;
+      
+      console.log('Recording attendance for:', studentName, studentId, matricNumber);
+      
+      // Check if attendance already exists for today and this course
+      const { data: existingAttendance, error: fetchError } = await supabase
+        .from('student_attendance')
+        .select('id, score')
+        .eq('student_id', studentId)
+        .eq('course_code', selectedCourseData.code)
+        .eq('attendance_date', attendanceDate)
+        .single();
+      
+      if (fetchError && fetchError.code !== 'PGRST116') {
+        throw fetchError;
+      }
+      
+      if (existingAttendance) {
+        // Update existing attendance
+        const { error } = await supabase
+          .from('student_attendance')
+          .update({
+            check_in_time: new Date().toISOString(),
+            verification_method: 'face_recognition',
+            confidence_score: result.confidence || 0.95,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existingAttendance.id);
+        
+        if (error) throw error;
+        message.success(`Attendance updated for ${studentName}`);
+      } else {
+        // Create new attendance record
+        const attendanceData = {
+          student_id: studentId,
+          student_name: studentName,
+          matric_number: matricNumber,
+          course_code: selectedCourseData.code,
+          course_title: selectedCourseData.title,
+          level: studentData.level || selectedCourseData.level,
+          attendance_date: attendanceDate,
+          check_in_time: new Date().toISOString(),
+          status: 'present',
+          verification_method: 'face_recognition',
+          confidence_score: result.confidence || 0.95,
+          score: 2.00,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+        
+        console.log('Inserting attendance record:', attendanceData);
+        
+        const { error } = await supabase
+          .from('student_attendance')
+          .insert([attendanceData]);
+        
+        if (error) throw error;
+        message.success(`Attendance recorded for ${studentName}`);
+      }
+      
+      // Refresh attendance records
+      fetchAttendanceRecords();
+      
+    } catch (error: any) {
+      console.error('Record attendance error:', error);
+      throw error;
+    }
+  };
+
+  // Update the handleAttendanceComplete function
   const handleAttendanceComplete = async (result: any) => {
     console.log('Face recognition result:', result);
     
@@ -136,6 +213,7 @@ const AttendancePage: React.FC = () => {
     
     if (result.success && result.student) {
       setCaptureStatus('Captured Successfully');
+      setMatchedStudentData(null); // Reset previous student data
       
       try {
         if (!selectedCourseData) {
@@ -143,9 +221,10 @@ const AttendancePage: React.FC = () => {
           return;
         }
         
-        const attendanceDate = selectedDate;
         const student = result.student;
         const matricNumber = student.matric_number;
+        
+        console.log('Looking for student with matric:', matricNumber);
         
         // Find student in database by matric number
         const { data: studentData, error: studentError } = await supabase
@@ -155,70 +234,41 @@ const AttendancePage: React.FC = () => {
           .eq('enrollment_status', 'enrolled')
           .maybeSingle();
         
-        if (studentError || !studentData) {
-          message.error(`Student ${student.name} not found or not enrolled`);
+        console.log('Student query result:', { studentData, studentError });
+        
+        if (studentError) {
+          console.error('Student query error:', studentError);
+          message.error(`Database error: ${studentError.message}`);
           return;
         }
         
-        const studentId = studentData.student_id;
-        const studentName = studentData.name;
+        let finalStudentData = studentData;
         
-        // Check if attendance already exists for today and this course
-        const { data: existingAttendance, error: fetchError } = await supabase
-          .from('student_attendance')
-          .select('id, score')
-          .eq('student_id', studentId)
-          .eq('course_code', selectedCourseData.code)
-          .eq('attendance_date', attendanceDate)
-          .single();
-        
-        if (fetchError && fetchError.code !== 'PGRST116') {
-          throw fetchError;
+        if (!studentData) {
+          // Try name-based search as fallback
+          console.log('Student not found by matric, trying by name...');
+          const { data: studentByName } = await supabase
+            .from('students')
+            .select('*')
+            .ilike('name', `%${student.name}%`)
+            .eq('enrollment_status', 'enrolled')
+            .maybeSingle();
+          
+          if (studentByName) {
+            console.log('Found student by name:', studentByName);
+            finalStudentData = studentByName;
+          } else {
+            console.log('Student not found in database:', student);
+            message.error(`Student "${student.name}" not found or not enrolled`);
+            return;
+          }
         }
         
-        if (existingAttendance) {
-          // Update existing attendance
-          const { error } = await supabase
-            .from('student_attendance')
-            .update({
-              check_in_time: new Date().toISOString(),
-              verification_method: 'face_recognition',
-              confidence_score: result.confidence || 0.95,
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', existingAttendance.id);
-          
-          if (error) throw error;
-          message.success(`Attendance updated for ${studentName}`);
-        } else {
-          // Create new attendance record
-          const attendanceData = {
-            student_id: studentId,
-            student_name: studentName,
-            matric_number: matricNumber,
-            course_code: selectedCourseData.code,
-            course_title: selectedCourseData.title,
-            level: studentData.level || selectedCourseData.level,
-            attendance_date: attendanceDate,
-            check_in_time: new Date().toISOString(),
-            status: 'present',
-            verification_method: 'face_recognition',
-            confidence_score: result.confidence || 0.95,
-            score: 2.00,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          };
-          
-          const { error } = await supabase
-            .from('student_attendance')
-            .insert([attendanceData]);
-          
-          if (error) throw error;
-          message.success(`Attendance recorded for ${studentName}`);
-        }
+        // Store the matched student data
+        setMatchedStudentData(finalStudentData);
         
-        // Refresh attendance records
-        fetchAttendanceRecords();
+        // Record attendance
+        await recordAttendance(finalStudentData, result);
         
       } catch (error: any) {
         console.error('Attendance error:', error);
@@ -233,6 +283,7 @@ const AttendancePage: React.FC = () => {
     setTimeout(() => {
       setFaceResult(null);
       setCaptureStatus('Ready to capture');
+      setMatchedStudentData(null);
     }, 5000);
   };
 
@@ -250,6 +301,7 @@ const AttendancePage: React.FC = () => {
   const startFaceAttendance = () => {
     setIsCameraActive(true);
     setFaceResult(null);
+    setMatchedStudentData(null);
     setCaptureStatus('Camera is active. Make sure face is clearly visible.');
   };
 
@@ -257,6 +309,7 @@ const AttendancePage: React.FC = () => {
   const stopCamera = () => {
     setIsCameraActive(false);
     setFaceResult(null);
+    setMatchedStudentData(null);
     setIsCapturing(false);
     setCaptureStatus('Ready to capture');
   };
@@ -338,14 +391,14 @@ const AttendancePage: React.FC = () => {
     });
   };
 
-  // Handle manual mark present - FIXED: Added this missing function
+  // Handle manual mark present
   const handleManualMarkPresent = (record: any) => {
     setSelectedStudent(record);
     setScoreInputValue(record.score || 2.00);
     setScoreModalVisible(true);
   };
 
-  // Save manual attendance - FIXED: Added this missing function
+  // Save manual attendance
   const saveManualAttendance = async () => {
     if (!selectedStudent || !selectedCourseData) {
       message.error('No student or course selected');
@@ -633,7 +686,7 @@ const AttendancePage: React.FC = () => {
             </div>
           </Card>
 
-          {/* Result Display Section similar to WhatsApp image */}
+          {/* Result Section */}
           {isCameraActive && (
             <Card style={{ marginBottom: 20 }}>
               <div style={{ textAlign: 'center' }}>
@@ -645,15 +698,12 @@ const AttendancePage: React.FC = () => {
                   style={{ marginBottom: 20 }}
                 />
                 
-                {/* Face Camera Component */}
-                {/* Note: You may need to update your FaceCamera component to accept onCaptureStatus prop */}
                 <FaceCamera
                   mode="attendance"
                   onAttendanceComplete={handleAttendanceComplete}
                   onCaptureStatus={handleFaceCaptureStatus}
                 />
                 
-                {/* Result Section */}
                 <Divider>Result</Divider>
                 
                 <Card 
@@ -696,28 +746,118 @@ const AttendancePage: React.FC = () => {
                         <Descriptions.Item label="Matric Number">
                           <Text strong>{faceResult.student.matric_number}</Text>
                         </Descriptions.Item>
-                        <Descriptions.Item label="Confidence">
-                         
-                        <Progress 
-                          percent={Number((faceResult.confidence * 100).toFixed(1))} 
-                          size="small" 
-                          strokeColor={
-                            faceResult.confidence > 0.8 ? '#52c41a' : 
-                            faceResult.confidence > 0.6 ? '#faad14' : '#f5222d'
-                          }
-                          format={() => `${(faceResult.confidence * 100).toFixed(1)}%`}
-                        />
-                        </Descriptions.Item>
+                        
+                        {/* Display stored photo if available */}
+                        {matchedStudentData?.photo_url && (
+                          <Descriptions.Item label="Stored Photo">
+                            <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+                              <Image
+                                width={80}
+                                height={80}
+                                src={matchedStudentData.photo_url}
+                                style={{ 
+                                  borderRadius: '8px', 
+                                  objectFit: 'cover',
+                                  border: '2px solid #1890ff'
+                                }}
+                                fallback="/placeholder-avatar.jpg"
+                                placeholder={
+                                  <div style={{
+                                    width: 80,
+                                    height: 80,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    backgroundColor: '#f0f0f0',
+                                    borderRadius: '8px'
+                                  }}>
+                                    <User size={24} color="#999" />
+                                  </div>
+                                }
+                              />
+                              <div>
+                                <Text strong style={{ fontSize: '12px' }}>Enrollment Date:</Text>
+                                <br />
+                                <Text type="secondary" style={{ fontSize: '11px' }}>
+                                  {dayjs(matchedStudentData.enrollment_date).format('DD/MM/YYYY')}
+                                </Text>
+                                <br />
+                                <Text strong style={{ fontSize: '12px' }}>Level:</Text>
+                                <br />
+                                <Text type="secondary" style={{ fontSize: '11px' }}>
+                                  {matchedStudentData.level || 'N/A'}
+                                </Text>
+                              </div>
+                            </div>
+                          </Descriptions.Item>
+                        )}
+                        
+                        {faceResult.confidence && (
+                          <Descriptions.Item label="Confidence">
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                              <Progress 
+                                percent={Number((faceResult.confidence * 100).toFixed(1))} 
+                                size="small" 
+                                style={{ flex: 1 }}
+                                strokeColor={
+                                  faceResult.confidence > 0.8 ? '#52c41a' : 
+                                  faceResult.confidence > 0.6 ? '#faad14' : '#f5222d'
+                                }
+                                format={() => `${(faceResult.confidence * 100).toFixed(1)}%`}
+                              />
+                              <Tag 
+                                color={
+                                  faceResult.confidence > 0.8 ? 'success' : 
+                                  faceResult.confidence > 0.6 ? 'warning' : 'error'
+                                }
+                              >
+                                {faceResult.confidence > 0.8 ? 'High' : 
+                                 faceResult.confidence > 0.6 ? 'Medium' : 'Low'}
+                              </Tag>
+                            </div>
+                          </Descriptions.Item>
+                        )}
+                        
                         <Descriptions.Item label="Course">
                           <Tag color="blue">{selectedCourseData?.code}</Tag>
+                          <Text style={{ marginLeft: '8px' }}>{selectedCourseData?.title}</Text>
                         </Descriptions.Item>
+                        
                         <Descriptions.Item label="Time">
-                          {dayjs().format('HH:mm:ss')}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <Calendar size={14} />
+                            <Text>{dayjs().format('HH:mm:ss')}</Text>
+                          </div>
+                        </Descriptions.Item>
+                        
+                        <Descriptions.Item label="Method">
+                          <Tag color="green">Face Recognition</Tag>
                         </Descriptions.Item>
                       </>
                     )}
                   </Descriptions>
                 </Card>
+                
+                {/* Captured Photo Preview (if available) */}
+                {faceResult?.photoUrl && (
+                  <Card size="small" style={{ marginBottom: 20 }}>
+                    <Title level={5} style={{ textAlign: 'center' }}>Captured Photo</Title>
+                    <div style={{ textAlign: 'center' }}>
+                      <Image
+                        src={faceResult.photoUrl}
+                        alt="Captured face"
+                        style={{
+                          maxWidth: '200px',
+                          borderRadius: '8px',
+                          border: '2px solid #52c41a'
+                        }}
+                      />
+                      <Text type="secondary" style={{ display: 'block', marginTop: '8px' }}>
+                        {dayjs(faceResult.timestamp).format('HH:mm:ss')}
+                      </Text>
+                    </div>
+                  </Card>
+                )}
                 
                 <div style={{ marginTop: 20 }}>
                   <Button 
@@ -725,13 +865,14 @@ const AttendancePage: React.FC = () => {
                     size="large"
                     onClick={stopCamera}
                     danger={isCapturing}
+                    disabled={isCapturing}
+                    loading={isCapturing}
                   >
-                    Stop Camera
+                    {isCapturing ? 'Processing...' : 'Stop Camera'}
                   </Button>
                 </div>
               </div>
               
-              {/* Footer similar to WhatsApp image */}
               <Divider />
               <div style={{ textAlign: 'center', color: '#666', fontSize: '0.9em' }}>
                 <Text type="secondary">
@@ -741,7 +882,7 @@ const AttendancePage: React.FC = () => {
                 <Text type="secondary" style={{ fontSize: '0.8em' }}>
                   Developed for Daily Student Attendance with Offline Support
                   <br />
-                  Database Connected
+                  Database Connected • Face Recognition Active
                 </Text>
               </div>
             </Card>

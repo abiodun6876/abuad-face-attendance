@@ -1,4 +1,4 @@
-// src/pages/EnrollmentPage.tsx - SIMPLIFIED VERSION FOR ATTENDANCE
+// src/pages/EnrollmentPage.tsx - FIXED VERSION
 import React, { useState, useEffect } from 'react';
 import { 
   Card, 
@@ -14,73 +14,27 @@ import {
   Col,
   Steps,
   Tag,
-  Input as AntdInput,
   Spin
 } from 'antd';
 import { Camera, User, BookOpen, CheckCircle, GraduationCap, Calendar } from 'lucide-react';
 import FaceCamera from '../components/FaceCamera';
 import { supabase } from '../lib/supabase';
+import { compressImage } from '../utils/imageUtils';
 
 const { Title, Text } = Typography;
-
-// Local storage function - defined outside component
-const saveImageToLocalStorage = (studentId: string, imageId: string, imageData: string) => {
-  try {
-    const key = `face_images_${studentId}_${imageId}`;
-    
-    // Compress image if needed
-    if (imageData.length > 100000) {
-      const img = new window.Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return;
-        
-        // Resize
-        const maxSize = 300;
-        let width = img.width;
-        let height = img.height;
-        
-        if (width > height) {
-          if (width > maxSize) {
-            height = Math.round((height * maxSize) / width);
-            width = maxSize;
-          }
-        } else {
-          if (height > maxSize) {
-            width = Math.round((width * maxSize) / height);
-            height = maxSize;
-          }
-        }
-        
-        canvas.width = width;
-        canvas.height = height;
-        ctx.drawImage(img, 0, 0, width, height);
-        const compressedData = canvas.toDataURL('image/jpeg', 0.7);
-        localStorage.setItem(key, compressedData);
-        console.log('Image saved to localStorage (compressed)');
-      };
-      img.src = imageData;
-    } else {
-      localStorage.setItem(key, imageData);
-      console.log('Image saved to localStorage');
-    }
-  } catch (error) {
-    console.error('Error saving to localStorage:', error);
-  }
-};
 
 const EnrollmentPage: React.FC = () => {
   const [currentStep, setCurrentStep] = useState(0);
   const [studentData, setStudentData] = useState<any>({});
   const [loading, setLoading] = useState(false);
   const [form] = Form.useForm();
+  const [academicForm] = Form.useForm();
   const [enrollmentComplete, setEnrollmentComplete] = useState(false);
   const [enrollmentResult, setEnrollmentResult] = useState<any>(null);
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [matricNumber, setMatricNumber] = useState<string>('');
   
-  // State for fetched data - SIMPLIFIED
+  // State for fetched data
   const [programs, setPrograms] = useState<any[]>([]);
   const [levels, setLevels] = useState([
     { value: 100, label: '100 Level' },
@@ -96,31 +50,41 @@ const EnrollmentPage: React.FC = () => {
     return `ABU/${currentYear}/${randomNum}`;
   };
 
-  // Fetch programs only
+  // Fetch programs
   const fetchPrograms = async () => {
     try {
-      // Fetch programs
+      // Check if programs table exists
       const { data: programsData, error: programsError } = await supabase
         .from('programs')
         .select('id, code, name, short_name')
         .eq('is_active', true)
         .order('name');
 
-      if (programsError) throw programsError;
-      setPrograms(programsData || []);
+      if (programsError) {
+        console.warn('Programs table may not exist, using defaults:', programsError);
+        // Use default programs
+        setPrograms([
+          { id: '1', code: 'CSC', name: 'Computer Science', short_name: 'CS' },
+          { id: '2', code: 'EEE', name: 'Electrical Engineering', short_name: 'EE' },
+          { id: '3', code: 'MED', name: 'Medicine', short_name: 'MD' },
+          { id: '4', code: 'LAW', name: 'Law', short_name: 'LW' },
+        ]);
+        return;
+      }
 
+      setPrograms(programsData || []);
       console.log('Fetched programs:', programsData?.length || 0);
 
     } catch (error: any) {
-      console.error('Error fetching data:', error);
-      // If programs table doesn't exist, use default options
-      message.warning('Programs not loaded. Using default options.');
+      console.error('Error fetching programs:', error);
+      // Use defaults on error
       setPrograms([
         { id: '1', code: 'CSC', name: 'Computer Science', short_name: 'CS' },
         { id: '2', code: 'EEE', name: 'Electrical Engineering', short_name: 'EE' },
         { id: '3', code: 'MED', name: 'Medicine', short_name: 'MD' },
         { id: '4', code: 'LAW', name: 'Law', short_name: 'LW' },
       ]);
+      message.warning('Using default program options');
     }
   };
 
@@ -152,6 +116,10 @@ const EnrollmentPage: React.FC = () => {
         setStudentData(values);
         setCurrentStep(1);
       } else if (currentStep === 1) {
+        // Validate academic form
+        await academicForm.validateFields();
+        const academicValues = await academicForm.getFieldsValue();
+        setStudentData((prev: any) => ({ ...prev, ...academicValues }));
         setCurrentStep(2);
       }
     } catch (error: any) {
@@ -172,196 +140,216 @@ const EnrollmentPage: React.FC = () => {
     message.success('New matric number generated');
   };
 
-  const handleEnrollmentComplete = async (result: any) => {
-    console.log('Face capture result:', {
-      success: result.success,
-      hasEmbedding: !!result.embedding,
-      embeddingLength: result.embedding?.length,
-      hasPhoto: !!result.photoUrl,
-      message: result.message
-    });
-    
-    if (result.success) {
-      try {
-        setLoading(true);
-        
-        // Use studentData from state
-        const studentName = studentData.name?.trim();
-        const studentId = matricNumber; // Use the generated matric number
-        
-        if (!studentName) {
-          throw new Error('Student name is required');
-        }
-
-        // Check if student already exists
-        const { data: existingStudent } = await supabase
-          .from('students')
-          .select('id')
-          .eq('student_id', studentId)
-          .maybeSingle();
-
-        if (existingStudent) {
-          // If matric number exists, generate a new one
-          const newMatric = generateMatricNumber();
-          setMatricNumber(newMatric);
-          form.setFieldValue('matric_number', newMatric);
-          message.warning('Matric number already exists, generating new one...');
-          setLoading(false);
-          return;
-        }
-
-        // Find selected program details
-        const selectedProgram = studentData.program_id 
-          ? programs.find(p => p.id === studentData.program_id)
-          : null;
-
-        // Get current academic year
-        const currentYear = new Date().getFullYear();
-        const academicSession = `${currentYear}/${currentYear + 1}`;
-
-        // Prepare student data - SIMPLIFIED for attendance
-        const studentRecord: any = {
-          student_id: studentId,
-          name: studentName,
-          matric_number: studentId,
-          // Removed email and phone as they're not needed for attendance
-          gender: studentData.gender || 'male',
-          enrollment_status: 'enrolled',
-          face_match_threshold: 0.7,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        };
-
-        // Add academic fields - ESSENTIAL for attendance
-        if (studentData.level) {
-          studentRecord.level = parseInt(studentData.level);
-        }
-        if (selectedProgram) {
-          studentRecord.program_id = selectedProgram.id;
-          studentRecord.program = selectedProgram.name;
-          studentRecord.program_name = selectedProgram.name;
-          studentRecord.program_code = selectedProgram.code;
-        }
-        // Add academic session
-        studentRecord.academic_session = academicSession;
-        studentRecord.year_of_entry = currentYear;
-
-        // Handle face data - ESSENTIAL for attendance
-        if (result.embedding && result.embedding.length > 0) {
-          console.log('Saving face embedding with length:', result.embedding.length);
-          
-          // Store embedding as JSON string (PostgreSQL friendly)
-          studentRecord.face_embedding = JSON.stringify(result.embedding);
-          studentRecord.face_enrolled_at = new Date().toISOString();
-          
-          if (result.photoUrl) {
-            // Compress photo URL if too long
-            studentRecord.photo_url = result.photoUrl.length > 100000 
-              ? result.photoUrl.substring(0, 100000) 
-              : result.photoUrl;
-          }
-        } else if (result.photoUrl) {
-          // If no embedding but has photo
-          console.log('No embedding, saving photo only');
-          studentRecord.photo_url = result.photoUrl;
-          studentRecord.face_enrolled_at = new Date().toISOString();
-        }
-
-        console.log('Saving student record:', {
-          name: studentRecord.name,
-          level: studentRecord.level,
-          program: selectedProgram?.name,
-          academic_session: studentRecord.academic_session,
-          hasFaceData: !!studentRecord.face_embedding || !!studentRecord.photo_url
-        });
-
-        // Save to database
-        const { data: student, error: studentError } = await supabase
-          .from('students')
-          .insert([studentRecord])
-          .select()
-          .single();
-
-        if (studentError) {
-          console.error('Database error:', studentError);
-          
-          // Try without embedding if that's the issue
-          if (studentError.message.includes('embedding')) {
-            console.log('Trying without embedding...');
-            const simpleRecord = { ...studentRecord };
-            delete simpleRecord.face_embedding;
-            
-            const { data: student2, error: studentError2 } = await supabase
-              .from('students')
-              .insert([simpleRecord])
-              .select()
-              .single();
-              
-            if (studentError2) {
-              throw new Error(`Failed to save student: ${studentError2.message}`);
-            }
-            
-            // Save image to localStorage after database save
-            if (result.photoUrl && student2) {
-              saveImageToLocalStorage(student2.id, student2.id, result.photoUrl);
-            }
-            
-            setEnrollmentResult({ 
-              success: true, 
-              student: student2,
-              localStorageSaved: !!result.photoUrl
-            });
-          } else {
-            throw new Error(`Database error: ${studentError.message}`);
-          }
-        } else {
-          // Save image to localStorage after database save
-          if (result.photoUrl && student) {
-            saveImageToLocalStorage(student.id, student.id, result.photoUrl);
-          }
-          
-          setEnrollmentResult({ 
-            success: true, 
-            student,
-            faceCaptured: !!result.embedding,
-            photoCaptured: !!result.photoUrl,
-            localStorageSaved: !!result.photoUrl,
-            program: selectedProgram?.name || 'Not specified',
-            level: studentRecord.level,
-            academic_session: academicSession
-          });
-        }
-
-        setEnrollmentComplete(true);
-        message.success('Student enrolled successfully!');
-
-      } catch (error: any) {
-        console.error('Enrollment error:', error);
-        message.error(`Error: ${error.message}`);
-        
-        setEnrollmentResult({
-          success: false,
-          message: error.message
-        });
-      } finally {
-        setLoading(false);
+  // Helper function to convert data URL to blob
+  const dataURLtoBlob = (dataURL: string): Blob => {
+    try {
+      const arr = dataURL.split(',');
+      const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/jpeg';
+      const bstr = atob(arr[1]);
+      const u8arr = new Uint8Array(bstr.length);
+      
+      for (let i = 0; i < bstr.length; i++) {
+        u8arr[i] = bstr.charCodeAt(i);
       }
-    } else {
-      message.error(`Face capture failed: ${result.message}`);
-      setEnrollmentResult(result);
+      
+      return new Blob([u8arr], { type: mime });
+    } catch (error) {
+      console.error('Error converting dataURL to blob:', error);
+      throw error;
     }
   };
 
-  const [academicForm] = Form.useForm();
-
-  const handleAcademicSubmit = async () => {
+  // Handle enrollment completion
+  const handleEnrollmentComplete = async (result: any) => {
     try {
-      const values = await academicForm.validateFields();
-      setStudentData((prev: any) => ({ ...prev, ...values }));
-      message.success('Academic information saved');
-      handleNext();
-    } catch (error) {
-      console.error('Academic form error:', error);
+      if (!result.success || !result.photoData) {
+        message.error('Failed to capture image');
+        return;
+      }
+
+      setLoading(true);
+
+      // Compress the image
+      const compressedImage = await compressImage(result.photoData.base64, 640, 0.8);
+      
+      // Generate a unique filename
+      const fileName = `enrollment_${Date.now()}_${studentData.name.replace(/\s+/g, '_')}.jpg`;
+      
+      // Prepare student ID (use matric number)
+      const studentId = studentData.matric_number || matricNumber;
+      
+      try {
+        let photoUrl = '';
+        
+        // Try to upload to Supabase Storage
+        try {
+          const { error: storageError } = await supabase.storage
+            .from('student-photos') // Make sure this bucket exists
+            .upload(fileName, dataURLtoBlob(compressedImage), {
+              contentType: 'image/jpeg',
+              upsert: true
+            });
+          
+          if (!storageError) {
+            // Get public URL
+            const { data: publicUrlData } = supabase.storage
+              .from('student-photos')
+              .getPublicUrl(fileName);
+            
+            photoUrl = publicUrlData.publicUrl;
+            console.log('Photo uploaded to storage:', photoUrl);
+          } else {
+            console.warn('Storage upload failed:', storageError);
+          }
+        } catch (storageError) {
+          console.warn('Storage bucket may not exist, using base64:', storageError);
+        }
+
+        // If storage failed, use base64
+        if (!photoUrl) {
+          photoUrl = compressedImage;
+        }
+        
+        // Get program name
+        const selectedProgram = programs.find(p => p.id === studentData.program_id);
+        const programName = selectedProgram?.name || selectedProgram?.code || 'Not specified';
+        
+        // Prepare complete student data
+        const completeStudentData = {
+          student_id: studentId,
+          name: studentData.name,
+          matric_number: studentId,
+          level: studentData.level,
+          program: programName,
+          program_id: studentData.program_id,
+          gender: studentData.gender || 'male',
+          enrollment_status: 'enrolled',
+          enrollment_date: new Date().toISOString(),
+          last_updated: new Date().toISOString(),
+          photo_url: photoUrl,
+          photo_updated_at: new Date().toISOString()
+        };
+        
+        console.log('Saving student data:', completeStudentData);
+        
+        // Save to students table
+        const { error: dbError } = await supabase
+          .from('students')
+          .upsert([completeStudentData], { 
+            onConflict: 'matric_number'
+          });
+        
+        if (dbError) {
+          console.error('Database error:', dbError);
+          // Try insert instead
+          const { error: insertError } = await supabase
+            .from('students')
+            .insert([completeStudentData]);
+          
+          if (insertError) {
+            throw insertError;
+          }
+        }
+        
+        // Store in student_photos table
+        try {
+          const { error: photoError } = await supabase
+            .from('student_photos')
+            .insert([{
+              student_id: studentId,
+              photo_url: photoUrl,
+              photo_data: compressedImage.replace(/^data:image\/\w+;base64,/, ''),
+              is_primary: true
+            }]);
+          
+          if (photoError) {
+            console.error('Failed to save photo metadata:', photoError);
+          }
+        } catch (photoError) {
+          console.warn('Could not save to student_photos table:', photoError);
+        }
+
+        // Save to local storage as backup
+        try {
+          const key = `face_image_${studentId}`;
+          localStorage.setItem(key, compressedImage);
+          console.log('Image saved to localStorage');
+        } catch (localError) {
+          console.warn('Local storage save failed:', localError);
+        }
+        
+        // Set enrollment result
+        setEnrollmentResult({
+          success: true,
+          message: 'Enrollment completed successfully!',
+          student: {
+            name: studentData.name,
+            student_id: studentId,
+            matric_number: studentId
+          },
+          level: studentData.level,
+          program: programName,
+          faceCaptured: true,
+          localStorageSaved: true,
+          photoUrl: photoUrl
+        });
+        
+        setEnrollmentComplete(true);
+        message.success(`Enrollment complete for ${studentData.name}!`);
+        
+      } catch (uploadError: any) {
+        console.error('Upload error:', uploadError);
+        
+        // Fallback: Save minimal data
+        const fallbackData = {
+          student_id: studentId,
+          name: studentData.name,
+          matric_number: studentId,
+          level: studentData.level,
+          program_id: studentData.program_id,
+          gender: studentData.gender || 'male',
+          enrollment_status: 'enrolled',
+          enrollment_date: new Date().toISOString(),
+          last_updated: new Date().toISOString(),
+          photo_url: null
+        };
+        
+        const { error: fallbackError } = await supabase
+          .from('students')
+          .insert([fallbackData]);
+        
+        if (fallbackError) {
+          throw fallbackError;
+        }
+        
+        setEnrollmentResult({
+          success: true,
+          message: 'Enrollment completed but photo save failed.',
+          student: {
+            name: studentData.name,
+            student_id: studentId,
+            matric_number: studentId
+          },
+          level: studentData.level,
+          faceCaptured: false,
+          localStorageSaved: false
+        });
+        
+        setEnrollmentComplete(true);
+        message.warning(`Enrollment complete for ${studentData.name}, but image save failed.`);
+      }
+      
+    } catch (error: any) {
+      console.error('Enrollment error:', error);
+      setEnrollmentResult({
+        success: false,
+        message: `Failed to complete enrollment: ${error.message}`,
+        error: error
+      });
+      setEnrollmentComplete(true);
+      message.error(`Failed to complete enrollment: ${error.message}`);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -418,13 +406,13 @@ const EnrollmentPage: React.FC = () => {
                   name="matric_number"
                   tooltip="This will also be used as Student ID"
                 >
-                  <Input.Group compact>
-                    <AntdInput
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    <Input
                       value={matricNumber}
                       readOnly
                       size="large"
                       style={{ 
-                        width: 'calc(100% - 120px)',
+                        flex: 1,
                         textTransform: 'uppercase',
                         backgroundColor: '#fafafa',
                         cursor: 'not-allowed'
@@ -435,11 +423,10 @@ const EnrollmentPage: React.FC = () => {
                       type="default"
                       size="large"
                       onClick={handleRegenerateMatric}
-                      style={{ width: '120px' }}
                     >
                       Regenerate
                     </Button>
-                  </Input.Group>
+                  </div>
                   <Text type="secondary" style={{ display: 'block', marginTop: 8 }}>
                     Matric number is auto-generated. Click "Regenerate" for a new number.
                   </Text>
@@ -575,19 +562,33 @@ const EnrollmentPage: React.FC = () => {
                   </Tag>
                 </p>
                 <p><strong>Program:</strong> {enrollmentResult.program}</p>
-                <p><strong>Academic Session:</strong> {enrollmentResult.academic_session}</p>
                 <p><strong>Status:</strong> <Tag color="success">Enrolled</Tag></p>
                 <p><strong>Face Data:</strong> 
                   <Tag color={enrollmentResult?.faceCaptured ? "green" : "orange"} style={{ marginLeft: 8 }}>
-                    {enrollmentResult?.faceCaptured ? 'Embedding + Photo' : 'Photo Only'}
+                    {enrollmentResult?.faceCaptured ? 'Photo Captured' : 'No Photo'}
                   </Tag>
                 </p>
                 <p><strong>Local Storage:</strong> 
                   <Tag color={enrollmentResult?.localStorageSaved ? "green" : "gray"} style={{ marginLeft: 8 }}>
-                    {enrollmentResult?.localStorageSaved ? 'Saved Locally' : 'Not Saved'}
+                    {enrollmentResult?.localStorageSaved ? 'Backup Saved' : 'No Backup'}
                   </Tag>
                 </p>
                 <p><strong>Enrollment Date:</strong> {new Date().toLocaleDateString()}</p>
+                
+                {enrollmentResult.photoUrl && (
+                  <div style={{ marginTop: 20, textAlign: 'center' }}>
+                    <p><strong>Captured Photo:</strong></p>
+                    <img 
+                      src={enrollmentResult.photoUrl} 
+                      alt="Student" 
+                      style={{ 
+                        maxWidth: '150px', 
+                        borderRadius: '8px',
+                        border: '2px solid #52c41a'
+                      }} 
+                    />
+                  </div>
+                )}
               </Card>
             </>
           ) : (
@@ -714,7 +715,13 @@ const EnrollmentPage: React.FC = () => {
             {isCameraActive ? (
               <FaceCamera
                 mode="enrollment"
-                student={studentData}
+                student={{
+                  id: studentData.matric_number || matricNumber,
+                  name: studentData.name,
+                  matric_number: studentData.matric_number || matricNumber,
+                  level: studentData.level,
+                  program_id: studentData.program_id
+                }}
                 onEnrollmentComplete={handleEnrollmentComplete}
               />
             ) : (
@@ -789,7 +796,7 @@ const EnrollmentPage: React.FC = () => {
               )}
               <Button 
                 type="primary" 
-                onClick={currentStep === 1 ? handleAcademicSubmit : handleNext} 
+                onClick={handleNext} 
                 size="large"
                 loading={loading}
               >
