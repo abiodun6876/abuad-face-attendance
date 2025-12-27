@@ -1,4 +1,4 @@
-// src/components/FaceCamera.tsx - UPDATED VERSION
+// src/components/FaceCamera.tsx - FIXED VERSION
 import React, { useState, useRef, useEffect } from 'react';
 import { Card, Button, Alert, Typography, Space, Progress, Row, Col } from 'antd';
 import { Camera, RefreshCw, CheckCircle, User, Video, VideoOff } from 'lucide-react';
@@ -10,7 +10,7 @@ interface FaceCameraProps {
   student?: any;
   onEnrollmentComplete?: (result: any) => void;
   onAttendanceComplete?: (result: any) => void;
-  onCaptureStatus?: (status: any) => void; // NEW: Added this prop
+  onCaptureStatus?: (status: any) => void;
 }
 
 const FaceCamera: React.FC<FaceCameraProps> = ({
@@ -18,7 +18,7 @@ const FaceCamera: React.FC<FaceCameraProps> = ({
   student,
   onEnrollmentComplete,
   onAttendanceComplete,
-  onCaptureStatus // NEW: Accept the prop
+  onCaptureStatus
 }) => {
   const [isCapturing, setIsCapturing] = useState(false);
   const [isCameraActive, setIsCameraActive] = useState(false);
@@ -54,24 +54,19 @@ const FaceCamera: React.FC<FaceCameraProps> = ({
     console.log('Debug Info:', info);
   }, []);
 
-  // Test camera function - simpler approach
+  // Test camera function
   const testCamera = async () => {
     console.log('Testing camera...');
     
     try {
-      // First, list available devices
       const devices = await navigator.mediaDevices.enumerateDevices();
-      console.log('Available devices:', devices);
-      
       const videoDevices = devices.filter(device => device.kind === 'videoinput');
-      console.log('Video devices:', videoDevices);
       
       if (videoDevices.length === 0) {
         setError('No camera found on your device.');
         return false;
       }
 
-      // Try to get camera stream
       const constraints = {
         video: {
           deviceId: videoDevices[0].deviceId ? { exact: videoDevices[0].deviceId } : undefined,
@@ -97,13 +92,11 @@ const FaceCamera: React.FC<FaceCameraProps> = ({
     console.log('Starting camera...');
     setError(null);
     
-    // Send status update
     updateCaptureStatus({ 
       isCapturing: false, 
       message: 'Starting camera...' 
     });
     
-    // Check basic requirements
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       setError('Your browser does not support camera access. Try Chrome, Firefox, or Edge.');
       updateCaptureStatus({ 
@@ -113,7 +106,6 @@ const FaceCamera: React.FC<FaceCameraProps> = ({
       return;
     }
 
-    // Check if we're on a secure context
     const isSecure = window.location.protocol === 'https:' || 
                     window.location.hostname === 'localhost' || 
                     window.location.hostname === '127.0.0.1';
@@ -128,18 +120,16 @@ const FaceCamera: React.FC<FaceCameraProps> = ({
     }
 
     try {
-      // Try multiple constraint options
       const constraintsOptions = [
-        { video: true, audio: false }, // Simple
-        { video: { facingMode: 'user' }, audio: false }, // Front camera
-        { video: { facingMode: 'environment' }, audio: false }, // Back camera
-        { video: { width: 640, height: 480 }, audio: false } // Specific size
+        { video: true, audio: false },
+        { video: { facingMode: 'user' }, audio: false },
+        { video: { facingMode: 'environment' }, audio: false },
+        { video: { width: 640, height: 480 }, audio: false }
       ];
 
       let stream = null;
       let lastError = null;
 
-      // Try each constraint until one works
       for (const constraints of constraintsOptions) {
         try {
           console.log('Trying constraints:', constraints);
@@ -165,7 +155,6 @@ const FaceCamera: React.FC<FaceCameraProps> = ({
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         
-        // Wait for video to load
         await new Promise((resolve) => {
           if (videoRef.current) {
             const onLoaded = () => {
@@ -181,7 +170,6 @@ const FaceCamera: React.FC<FaceCameraProps> = ({
         setIsCameraActive(true);
         console.log('Camera is now active');
         
-        // Send status update
         updateCaptureStatus({ 
           isCapturing: false, 
           message: 'Camera is active. Make sure face is clearly visible.',
@@ -209,7 +197,6 @@ const FaceCamera: React.FC<FaceCameraProps> = ({
       setError(errorMessage);
       setIsCameraActive(false);
       
-      // Send status update
       updateCaptureStatus({ 
         isCapturing: false, 
         message: 'Camera failed to start',
@@ -229,7 +216,6 @@ const FaceCamera: React.FC<FaceCameraProps> = ({
     setIsCameraActive(false);
     setCapturedImage(null);
     
-    // Send status update
     updateCaptureStatus({ 
       isCapturing: false, 
       message: 'Camera stopped',
@@ -278,7 +264,6 @@ const FaceCamera: React.FC<FaceCameraProps> = ({
       return;
     }
 
-    // Send status update
     updateCaptureStatus({ 
       isCapturing: true, 
       message: 'Capturing face...' 
@@ -298,11 +283,11 @@ const FaceCamera: React.FC<FaceCameraProps> = ({
     processCapture(image);
   };
 
+  // Updated processCapture function
   const processCapture = (imageData: string) => {
     setIsCapturing(true);
     setProgress(0);
 
-    // Send status update
     updateCaptureStatus({ 
       isCapturing: true, 
       message: 'Processing face capture...' 
@@ -313,26 +298,39 @@ const FaceCamera: React.FC<FaceCameraProps> = ({
         if (prev >= 100) {
           clearInterval(interval);
           
+          // Create complete result object
           const result = {
             success: true,
             message: `${mode === 'enrollment' ? 'Enrollment' : 'Attendance'} successful!`,
             timestamp: new Date().toISOString(),
             photoUrl: imageData,
+            photoData: {
+              base64: imageData,
+              width: canvasRef.current?.width || 640,
+              height: canvasRef.current?.height || 480,
+              format: 'image/jpeg'
+            },
             quality: 0.9
           };
 
           if (mode === 'enrollment') {
+            // Include all student data
             Object.assign(result, {
-              studentId: student?.id,
+              studentId: student?.id || student?.student_id || student?.matric_number,
               studentName: student?.name,
+              matricNumber: student?.matric_number,
+              student: student,
+              studentData: student,
               embedding: []
             });
+            
+            console.log('Enrollment result to send:', result);
+            console.log('Student data available:', student);
             
             setTimeout(() => {
               setIsCapturing(false);
               onEnrollmentComplete?.(result);
               
-              // Send status update
               updateCaptureStatus({ 
                 isCapturing: false, 
                 message: 'Enrollment complete!',
@@ -353,7 +351,6 @@ const FaceCamera: React.FC<FaceCameraProps> = ({
               setIsCapturing(false);
               onAttendanceComplete?.(result);
               
-              // Send status update
               updateCaptureStatus({ 
                 isCapturing: false, 
                 message: 'Attendance recorded!',
@@ -369,12 +366,11 @@ const FaceCamera: React.FC<FaceCameraProps> = ({
     }, 200);
   };
 
-  // Fallback simulation
+  // Single useSimulation function (removed duplicate)
   const useSimulation = () => {
     setIsCapturing(true);
     setProgress(0);
     
-    // Send status update
     updateCaptureStatus({ 
       isCapturing: true, 
       message: 'Starting simulation...' 
@@ -390,21 +386,32 @@ const FaceCamera: React.FC<FaceCameraProps> = ({
             message: 'Simulation mode - Face captured successfully',
             timestamp: new Date().toISOString(),
             photoUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${student?.matric_number || 'test'}`,
+            photoData: {
+              base64: `data:image/svg+xml;base64,...`,
+              width: 400,
+              height: 400,
+              format: 'svg'
+            },
             quality: 0.85
           };
 
           if (mode === 'enrollment') {
+            // Include all student data in simulation
             Object.assign(result, {
-              studentId: student?.id,
+              studentId: student?.id || student?.student_id || student?.matric_number,
               studentName: student?.name,
+              matricNumber: student?.matric_number,
+              student: student,
+              studentData: student,
               embedding: []
             });
+            
+            console.log('Simulation enrollment result:', result);
             
             setTimeout(() => {
               setIsCapturing(false);
               onEnrollmentComplete?.(result);
               
-              // Send status update
               updateCaptureStatus({ 
                 isCapturing: false, 
                 message: 'Simulation: Enrollment complete',
@@ -425,7 +432,6 @@ const FaceCamera: React.FC<FaceCameraProps> = ({
               setIsCapturing(false);
               onAttendanceComplete?.(result);
               
-              // Send status update
               updateCaptureStatus({ 
                 isCapturing: false, 
                 message: 'Simulation: Attendance recorded',
@@ -469,7 +475,6 @@ const FaceCamera: React.FC<FaceCameraProps> = ({
         />
       )}
 
-      {/* Debug Info */}
       <Alert
         message="Environment Check"
         description={
@@ -682,7 +687,6 @@ const FaceCamera: React.FC<FaceCameraProps> = ({
         </Text>
       </div>
 
-      {/* Hidden canvas */}
       <canvas ref={canvasRef} style={{ display: 'none' }} />
     </Card>
   );
