@@ -1,6 +1,5 @@
-// src/services/syncService.ts
 import { supabase } from '../lib/supabase';
-import { faceRecognition } from '../utils/faceRecognition';
+import faceRecognition from '../utils/faceRecognition';
 
 export interface SyncResult {
   success: boolean;
@@ -129,6 +128,7 @@ class SyncService {
     };
 
     try {
+      // This should now work with the faceRecognition module
       const embeddings = faceRecognition.getEmbeddingsFromLocal();
       
       for (const embedding of embeddings) {

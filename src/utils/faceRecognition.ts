@@ -6,6 +6,9 @@ class FaceRecognition {
   private static instance: FaceRecognition;
   private modelsLoaded = false;
   
+  // Add this for local storage
+  private readonly EMBEDDINGS_KEY = 'face_embeddings';
+  
   private constructor() {}
   
   public static getInstance(): FaceRecognition {
@@ -77,7 +80,6 @@ class FaceRecognition {
     distance = Math.sqrt(distance);
     
     // Convert distance to similarity score (0-1)
-    // Typical face matching threshold is around 0.6
     const similarity = Math.max(0, 1 - (distance / 2));
     
     return similarity;
@@ -89,7 +91,7 @@ class FaceRecognition {
     storedDescriptors: Array<{studentId: string, descriptor: Float32Array}>
   ): Promise<{studentId: string | null, confidence: number}> {
     let bestMatch = { studentId: null as string | null, confidence: 0 };
-    const MATCH_THRESHOLD = 0.65; // Adjust based on testing
+    const MATCH_THRESHOLD = 0.65;
     
     for (const stored of storedDescriptors) {
       const similarity = this.compareFaces(capturedDescriptor, stored.descriptor);
@@ -115,34 +117,6 @@ class FaceRecognition {
     });
   }
   
-  // Helper: Convert base64 to Float32Array for storage
-  base64ToFloat32Array(base64: string): Float32Array {
-    // Remove data URL prefix if present
-    const cleanBase64 = base64.replace(/^data:image\/\w+;base64,/, '');
-    const binary = atob(cleanBase64);
-    const bytes = new Uint8Array(binary.length);
-    
-    for (let i = 0; i < binary.length; i++) {
-      bytes[i] = binary.charCodeAt(i);
-    }
-    
-    // Note: This is simplified. In practice, you'd want to store
-    // the face descriptor (128 or 512 floats) not the image bytes
-    return new Float32Array(bytes.buffer);
-  }
-  
-  // Helper: Float32Array to base64 for storage
-  float32ArrayToBase64(array: Float32Array): string {
-    const bytes = new Uint8Array(array.buffer);
-    let binary = '';
-    
-    for (let i = 0; i < bytes.byteLength; i++) {
-      binary += String.fromCharCode(bytes[i]);
-    }
-    
-    return btoa(binary);
-  }
-  
   // Optimized face matching for attendance
   async matchFaceForAttendance(
     capturedImage: string,
@@ -162,7 +136,7 @@ class FaceRecognition {
         .select('student_id, name, photo_data, face_embedding')
         .eq('enrollment_status', 'enrolled')
         .not('photo_data', 'is', null)
-        .limit(100); // Limit for performance
+        .limit(100);
       
       if (!students || students.length === 0) {
         return [];
@@ -193,7 +167,7 @@ class FaceRecognition {
           if (storedDescriptor) {
             const similarity = this.compareFaces(capturedDescriptor, storedDescriptor);
             
-            if (similarity > 0.6) { // Basic threshold
+            if (similarity > 0.6) {
               matches.push({
                 studentId: student.student_id,
                 name: student.name,
@@ -235,6 +209,73 @@ class FaceRecognition {
     } catch (error) {
       console.error('Error updating face embedding:', error);
     }
+  }
+  
+  // === ADD THESE METHODS FOR SYNC SERVICE ===
+  
+  // Save an embedding to localStorage
+  saveEmbeddingToLocal(studentId: string, descriptor: Float32Array): void {
+    const embeddings = this.getEmbeddingsFromLocal();
+    
+    // Remove existing embedding for this student
+    const filtered = embeddings.filter(e => e.studentId !== studentId);
+    
+    // Add new embedding (convert Float32Array to regular array for localStorage)
+    const descriptorArray = Array.from(descriptor);
+    filtered.push({ 
+      studentId, 
+      descriptor: descriptorArray,
+      timestamp: new Date().toISOString() 
+    });
+    
+    localStorage.setItem(this.EMBEDDINGS_KEY, JSON.stringify(filtered));
+  }
+  
+  // Get all embeddings from localStorage (what syncService.ts expects)
+  getEmbeddingsFromLocal(): Array<{
+    studentId: string;
+    descriptor: number[];
+    timestamp: string;
+  }> {
+    const data = localStorage.getItem(this.EMBEDDINGS_KEY);
+    return data ? JSON.parse(data) : [];
+  }
+  
+  // Convert number[] back to Float32Array
+  getEmbeddingForStudent(studentId: string): Float32Array | null {
+    const embeddings = this.getEmbeddingsFromLocal();
+    const found = embeddings.find(e => e.studentId === studentId);
+    return found ? new Float32Array(found.descriptor) : null;
+  }
+  
+  // Clear all local embeddings
+  clearLocalEmbeddings(): void {
+    localStorage.removeItem(this.EMBEDDINGS_KEY);
+  }
+  
+  // Check if student has local embedding
+  hasLocalEmbedding(studentId: string): boolean {
+    return this.getEmbeddingForStudent(studentId) !== null;
+  }
+  
+  // Sync local embeddings to Supabase
+  async syncLocalEmbeddingsToDatabase(): Promise<Array<{
+    studentId: string;
+    descriptor: number[];
+  }>> {
+    const localEmbeddings = this.getEmbeddingsFromLocal();
+    const syncedEmbeddings: Array<{studentId: string; descriptor: number[]}> = [];
+    
+    for (const embedding of localEmbeddings) {
+      try {
+        await this.updateFaceEmbedding(embedding.studentId, new Float32Array(embedding.descriptor));
+        syncedEmbeddings.push(embedding);
+      } catch (error) {
+        console.error(`Failed to sync embedding for student ${embedding.studentId}:`, error);
+      }
+    }
+    
+    return syncedEmbeddings;
   }
 }
 

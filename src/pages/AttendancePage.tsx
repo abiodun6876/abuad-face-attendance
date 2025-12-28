@@ -29,6 +29,7 @@ import FaceCamera from '../components/FaceCamera';
 import { supabase } from '../lib/supabase';
 import dayjs from 'dayjs';
 
+
 const { Title, Text } = Typography;
 const { useBreakpoint } = Grid;
 const { TabPane } = Tabs;
