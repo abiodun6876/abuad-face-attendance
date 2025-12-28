@@ -1,4 +1,4 @@
-// src/pages/AttendancePage.tsx
+// src/pages/AttendancePage.tsx - COMPLETE FIXED VERSION
 import React, { useState, useEffect } from 'react';
 import {
   Card,
@@ -24,11 +24,11 @@ import {
   Descriptions,
   Image
 } from 'antd';
-import { Camera, Calendar, CheckCircle, XCircle, Users, User } from 'lucide-react'; // Added User icon
+import { Camera, Calendar, CheckCircle, XCircle, Users, User, RefreshCw } from 'lucide-react';
 import FaceCamera from '../components/FaceCamera';
 import { supabase } from '../lib/supabase';
+import faceRecognition from '../utils/faceRecognition';
 import dayjs from 'dayjs';
-
 
 const { Title, Text } = Typography;
 const { useBreakpoint } = Grid;
@@ -60,6 +60,7 @@ const AttendancePage: React.FC = () => {
   const [isCapturing, setIsCapturing] = useState(false);
   const [captureStatus, setCaptureStatus] = useState<string>('Ready to capture');
   const [matchedStudentData, setMatchedStudentData] = useState<any>(null);
+  const [faceModelsLoaded, setFaceModelsLoaded] = useState(false);
 
   // Fetch all courses
   const fetchCourses = async () => {
@@ -130,7 +131,7 @@ const AttendancePage: React.FC = () => {
     }
   };
 
-  // ADD THIS MISSING FUNCTION - Record Attendance
+  // Record Attendance
   const recordAttendance = async (studentData: any, result: any) => {
     try {
       const attendanceDate = selectedDate;
@@ -205,87 +206,81 @@ const AttendancePage: React.FC = () => {
     }
   };
 
-  // Update the handleAttendanceComplete function
-  const handleAttendanceComplete = async (result: any) => {
-    console.log('Face recognition result:', result);
-    
-    // Update face result state
-    setFaceResult(result);
-    
-    if (result.success && result.student) {
-      setCaptureStatus('Captured Successfully');
-      setMatchedStudentData(null); // Reset previous student data
+  // Process students who don't have embeddings yet
+  const processMissingEmbeddings = async () => {
+    try {
+      setLoading(true);
+      message.info('Processing face data for students...');
       
-      try {
-        if (!selectedCourseData) {
-          message.error('Please select a course first');
-          return;
-        }
-        
-        const student = result.student;
-        const matricNumber = student.matric_number;
-        
-        console.log('Looking for student with matric:', matricNumber);
-        
-        // Find student in database by matric number
-        const { data: studentData, error: studentError } = await supabase
-          .from('students')
-          .select('*')
-          .eq('matric_number', matricNumber)
-          .eq('enrollment_status', 'enrolled')
-          .maybeSingle();
-        
-        console.log('Student query result:', { studentData, studentError });
-        
-        if (studentError) {
-          console.error('Student query error:', studentError);
-          message.error(`Database error: ${studentError.message}`);
-          return;
-        }
-        
-        let finalStudentData = studentData;
-        
-        if (!studentData) {
-          // Try name-based search as fallback
-          console.log('Student not found by matric, trying by name...');
-          const { data: studentByName } = await supabase
-            .from('students')
-            .select('*')
-            .ilike('name', `%${student.name}%`)
-            .eq('enrollment_status', 'enrolled')
-            .maybeSingle();
-          
-          if (studentByName) {
-            console.log('Found student by name:', studentByName);
-            finalStudentData = studentByName;
-          } else {
-            console.log('Student not found in database:', student);
-            message.error(`Student "${student.name}" not found or not enrolled`);
-            return;
-          }
-        }
-        
-        // Store the matched student data
-        setMatchedStudentData(finalStudentData);
-        
-        // Record attendance
-        await recordAttendance(finalStudentData, result);
-        
-      } catch (error: any) {
-        console.error('Attendance error:', error);
-        message.error('Failed to save attendance: ' + error.message);
+      // Get students with photos but no embeddings
+      const { data: studentsWithoutEmbeddings } = await supabase
+        .from('students')
+        .select('student_id, name, photo_data')
+        .eq('enrollment_status', 'enrolled')
+        .not('photo_data', 'is', null)
+        .is('face_embedding', null)
+        .limit(10);
+      
+      if (!studentsWithoutEmbeddings || studentsWithoutEmbeddings.length === 0) {
+        message.success('All enrolled students already have face embeddings');
+        return 0;
       }
-    } else {
-      setCaptureStatus('Capture Failed');
-      message.error(`Face recognition failed: ${result.message || 'Unknown error'}`);
+      
+      console.log(`Processing ${studentsWithoutEmbeddings.length} students for embeddings...`);
+      let processedCount = 0;
+      let failedCount = 0;
+      
+      for (const student of studentsWithoutEmbeddings) {
+        try {
+          // Extract face embedding from photo
+          const descriptor = await faceRecognition.extractFaceDescriptor(
+            `data:image/jpeg;base64,${student.photo_data}`
+          );
+          
+          if (descriptor) {
+            // Save to database
+            const embeddingArray = Array.from(descriptor);
+            await supabase
+              .from('students')
+              .update({
+                face_embedding: embeddingArray,
+                last_face_update: new Date().toISOString()
+              })
+              .eq('student_id', student.student_id);
+            
+            processedCount++;
+            console.log(`✅ Processed: ${student.name}`);
+          } else {
+            console.log(`⚠️ No face detected in photo for: ${student.name}`);
+            failedCount++;
+          }
+          
+          // Small delay to avoid overwhelming
+          await new Promise(resolve => setTimeout(resolve, 300));
+        } catch (error) {
+          console.error(`❌ Failed for ${student.name}:`, error);
+          failedCount++;
+        }
+      }
+      
+      console.log(`Embeddings processed: ${processedCount}/${studentsWithoutEmbeddings.length}`);
+      
+      if (processedCount > 0) {
+        message.success(`Processed ${processedCount} students for face recognition`);
+      }
+      if (failedCount > 0) {
+        message.warning(`${failedCount} students could not be processed (no face detected)`);
+      }
+      
+      return processedCount;
+      
+    } catch (error) {
+      console.error('Error processing embeddings:', error);
+      message.error('Failed to process embeddings');
+      return 0;
+    } finally {
+      setLoading(false);
     }
-    
-    // Auto-hide result after 5 seconds
-    setTimeout(() => {
-      setFaceResult(null);
-      setCaptureStatus('Ready to capture');
-      setMatchedStudentData(null);
-    }, 5000);
   };
 
   // Handle face capture status
@@ -296,14 +291,36 @@ const AttendancePage: React.FC = () => {
     } else if (status.message) {
       setCaptureStatus(status.message);
     }
+    
+    // Update if camera is active
+    if (status.cameraActive !== undefined) {
+      // Camera status is handled by isCameraActive state
+    }
   };
 
-  // Start camera function
-  const startFaceAttendance = () => {
+  // Start camera function with face recognition initialization
+  const startFaceAttendance = async () => {
     setIsCameraActive(true);
     setFaceResult(null);
     setMatchedStudentData(null);
-    setCaptureStatus('Camera is active. Make sure face is clearly visible.');
+    setCaptureStatus('Initializing face recognition...');
+    
+    try {
+      // Pre-load face recognition models
+      if (!faceModelsLoaded) {
+        setCaptureStatus('Loading face recognition models...');
+        await faceRecognition.loadModels();
+        setFaceModelsLoaded(true);
+        console.log('Face recognition models loaded');
+      }
+      
+      setCaptureStatus('Camera is active. Make sure face is clearly visible.');
+      
+    } catch (error) {
+      console.warn('Failed to load face models:', error);
+      setCaptureStatus('Face recognition unavailable. Using basic capture.');
+      message.warning('Face recognition not available. Will use basic photo capture.');
+    }
   };
 
   // Stop camera function
@@ -313,6 +330,157 @@ const AttendancePage: React.FC = () => {
     setMatchedStudentData(null);
     setIsCapturing(false);
     setCaptureStatus('Ready to capture');
+  };
+
+  // ========== ACTUAL FACE RECOGNITION HANDLER ==========
+  const handleAttendanceComplete = async (result: any) => {
+    console.log('Face capture result:', result);
+    
+    // Update face result state
+    setFaceResult(result);
+    
+    if (result.success && result.photoUrl) {
+      setCaptureStatus('Processing face recognition...');
+      setMatchedStudentData(null);
+      setIsCapturing(true);
+      
+      try {
+        if (!selectedCourseData) {
+          message.error('Please select a course first');
+          setCaptureStatus('Select a course first');
+          setIsCapturing(false);
+          return;
+        }
+        
+        console.log('Starting face recognition matching...');
+        
+        // ========== ACTUAL FACE RECOGNITION ==========
+        // 1. Use face recognition to find matching students
+        const matches = await faceRecognition.matchFaceForAttendance(result.photoUrl);
+        console.log('Face matches found:', matches);
+        
+        if (matches.length === 0) {
+          setCaptureStatus('No matching student found');
+          
+          // Check if students need embeddings
+          const { count } = await supabase
+            .from('students')
+            .select('*', { count: 'exact', head: true })
+            .eq('enrollment_status', 'enrolled')
+            .not('photo_data', 'is', null)
+            .is('face_embedding', null);
+          
+          if (count && count > 0) {
+            message.warning(`No match found. ${count} students need face data processing.`);
+          } else {
+            message.error('No student match found. Please enroll student first or try again.');
+          }
+          
+          setIsCapturing(false);
+          return;
+        }
+        
+        // 2. Get the best match (highest confidence)
+        const bestMatch = matches[0];
+        console.log('Best match:', bestMatch);
+        
+        // Check confidence threshold
+        const CONFIDENCE_THRESHOLD = 0.65;
+        if (bestMatch.confidence < CONFIDENCE_THRESHOLD) {
+          setCaptureStatus('Match confidence too low');
+          message.warning(`Match found but confidence is low (${(bestMatch.confidence * 100).toFixed(1)}%). Try again.`);
+          setIsCapturing(false);
+          return;
+        }
+        
+        // 3. Get full student data from database
+        const { data: studentData, error: studentError } = await supabase
+          .from('students')
+          .select('*')
+          .eq('student_id', bestMatch.studentId)
+          .eq('enrollment_status', 'enrolled')
+          .maybeSingle();
+        
+        if (studentError) {
+          console.error('Database error:', studentError);
+          setCaptureStatus('Database error');
+          message.error(`Database error: ${studentError.message}`);
+          setIsCapturing(false);
+          return;
+        }
+        
+        if (!studentData) {
+          setCaptureStatus('Student not enrolled');
+          message.error('Matched student is not enrolled');
+          setIsCapturing(false);
+          return;
+        }
+        
+        // 4. Store the matched student data
+        setMatchedStudentData(studentData);
+        
+        // 5. Update face result with match details
+        setFaceResult({
+          ...result,
+          student: {
+            name: studentData.name,
+            matric_number: studentData.matric_number,
+            student_id: studentData.student_id
+          },
+          confidence: bestMatch.confidence,
+          success: true
+        });
+        
+        setCaptureStatus('Student identified!');
+        message.success(`Identified: ${studentData.name} (${(bestMatch.confidence * 100).toFixed(1)}% confidence)`);
+        
+        // 6. Record attendance
+        await recordAttendance(studentData, {
+          confidence: bestMatch.confidence,
+          photoUrl: result.photoUrl
+        });
+        
+        // 7. Update capture status
+        setCaptureStatus('Attendance recorded!');
+        
+      } catch (error: any) {
+        console.error('Face recognition error:', error);
+        
+        // Check for specific errors
+        if (error.message?.includes('models not loaded') || error.message?.includes('loadModels')) {
+          setCaptureStatus('Loading face models...');
+          message.warning('Loading face recognition models. Please wait...');
+          
+          // Try to load models and retry
+          try {
+            await faceRecognition.loadModels();
+            setFaceModelsLoaded(true);
+            // Retry after models load
+            setTimeout(() => handleAttendanceComplete(result), 1000);
+          } catch (loadError) {
+            setCaptureStatus('Face recognition unavailable');
+            message.error('Face recognition failed to load. Please try manual attendance.');
+            setIsCapturing(false);
+          }
+        } else {
+          setCaptureStatus('Face recognition error');
+          message.error(`Face recognition error: ${error.message}`);
+          setIsCapturing(false);
+        }
+      }
+    } else {
+      setCaptureStatus('Capture Failed');
+      message.error(`Face capture failed: ${result.message || 'Unknown error'}`);
+      setIsCapturing(false);
+    }
+    
+    // Auto-hide result after 8 seconds (give time to see results)
+    setTimeout(() => {
+      setFaceResult(null);
+      setCaptureStatus('Ready to capture');
+      setMatchedStudentData(null);
+      setIsCapturing(false);
+    }, 8000);
   };
 
   // Handle mark all present
@@ -547,7 +715,19 @@ const AttendancePage: React.FC = () => {
     },
   ];
 
+  // Load face recognition models on component mount
   useEffect(() => {
+    const loadFaceModels = async () => {
+      try {
+        await faceRecognition.loadModels();
+        setFaceModelsLoaded(true);
+        console.log('Face recognition models pre-loaded');
+      } catch (error) {
+        console.warn('Failed to pre-load face models:', error);
+      }
+    };
+    
+    loadFaceModels();
     fetchCourses();
   }, []);
 
@@ -661,7 +841,7 @@ const AttendancePage: React.FC = () => {
                   icon={<Camera />}
                   onClick={startFaceAttendance}
                   loading={loading}
-                  disabled={isCameraActive}
+                  disabled={isCameraActive || !selectedCourseData}
                 >
                   Start Face Attendance
                 </Button>
@@ -671,8 +851,19 @@ const AttendancePage: React.FC = () => {
                   size="large"
                   onClick={handleMarkAllPresent}
                   loading={loading}
+                  disabled={!selectedCourseData}
                 >
                   Mark All Present
+                </Button>
+                
+                <Button
+                  type="dashed"
+                  size="large"
+                  icon={<RefreshCw size={16} />}
+                  onClick={processMissingEmbeddings}
+                  loading={loading}
+                >
+                  Process Face Data
                 </Button>
               </Space>
               
@@ -682,6 +873,9 @@ const AttendancePage: React.FC = () => {
                   <Tag color="green">{selectedCourseData.title}</Tag>
                   <Tag color="purple">Level {selectedCourseData.level}</Tag>
                   <Tag color="orange">{dayjs(selectedDate).format('DD/MM/YYYY')}</Tag>
+                  <Tag color={faceModelsLoaded ? "green" : "orange"}>
+                    {faceModelsLoaded ? 'Face Recognition Ready' : 'Loading Face Models...'}
+                  </Tag>
                 </div>
               )}
             </div>
@@ -883,7 +1077,7 @@ const AttendancePage: React.FC = () => {
                 <Text type="secondary" style={{ fontSize: '0.8em' }}>
                   Developed for Daily Student Attendance with Offline Support
                   <br />
-                  Database Connected • Face Recognition Active
+                  Database Connected • {faceModelsLoaded ? 'Face Recognition Active ✓' : 'Loading Face Recognition...'}
                 </Text>
               </div>
             </Card>
@@ -926,6 +1120,7 @@ const AttendancePage: React.FC = () => {
                 <li>Click "Start Face Attendance" to activate camera</li>
                 <li>Student faces the camera</li>
                 <li>System automatically identifies student and marks attendance</li>
+                <li>Use "Process Face Data" button if students aren't being recognized</li>
                 <li>Or use "Mark All Present" for bulk marking</li>
               </ol>
             </div>
