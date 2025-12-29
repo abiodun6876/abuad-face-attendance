@@ -35,7 +35,8 @@ import FaceCamera from '../components/FaceCamera';
 import { supabase } from '../lib/supabase';
 import faceRecognition from '../utils/faceRecognition';
 import dayjs from 'dayjs';
-import './AttendancePage.css';
+import './App.css';
+
 
 const { Title, Text } = Typography;
 const { useBreakpoint } = Grid;
