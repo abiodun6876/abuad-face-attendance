@@ -1,13 +1,10 @@
-// src/App.tsx - UPDATED VERSION
+// src/App.tsx - CLEANED VERSION
 import React, { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { Layout, Menu, Button, Spin, Alert, Typography, Space, ConfigProvider, theme, Card, Row, Col, Grid } from 'antd';
 import { 
   User, 
   Camera, 
-  Users, 
-  Calendar, 
-  Settings, 
   LogIn, 
   LogOut,
   Home,
@@ -16,16 +13,12 @@ import {
   CheckCircle,
   XCircle,
   ArrowLeft,
-  BarChart,
-  Upload,
-  Download,
   UserPlus,
-  QrCode,
-  Book // Added Book icon
+  Book
 } from 'lucide-react';
 import EnrollmentPage from './pages/EnrollmentPage';
 import AttendancePage from './pages/AttendancePage';
-import AttendanceManagementPage from './pages/AttendanceManagementPage'; // ADD THIS IMPORT
+import AttendanceManagementPage from './pages/AttendanceManagementPage';
 import Dashboard from './pages/Dashboard';
 import ImageManagementPage from './pages/ImageManagementPage';
 import PWAInstallPrompt from './components/PWAInstallPrompt';
@@ -36,14 +29,12 @@ const { Header, Sider, Content, Footer } = Layout;
 const { Title, Text } = Typography;
 const { useBreakpoint } = Grid;
 
-// Interface for connection status
 interface ConnectionStatus {
   status: 'testing' | 'connected' | 'error';
   message: string;
   details?: any;
 }
 
-// Menu items configuration
 const menuItems = [
   {
     key: '1',
@@ -60,7 +51,6 @@ const menuItems = [
     icon: React.createElement(Camera, { size: 16 }),
     label: <Link to="/attendance">Take Attendance</Link>,
   },
-  // ADD THIS NEW MENU ITEM
   {
     key: '4',
     icon: React.createElement(Book, { size: 16 }),
@@ -73,7 +63,6 @@ const menuItems = [
   },
 ];
 
-// Home page cards component
 const HomeCards = () => {
   const navigate = useNavigate();
   const screens = useBreakpoint();
@@ -96,7 +85,6 @@ const HomeCards = () => {
       path: '/attendance',
       color: '#52c41a',
     },
-    // ADD THIS NEW CARD
     {
       key: 'attendance-management',
       title: 'Manage Attendance',
@@ -173,14 +161,12 @@ const HomeCards = () => {
   );
 };
 
-// Back button component
 const BackButton = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const screens = useBreakpoint();
   const isMobile = !screens.md;
   
-  // Don't show back button on home page
   if (location.pathname === '/') return null;
 
   return (
@@ -199,7 +185,6 @@ const BackButton = () => {
   );
 };
 
-// Main App Component
 function App() {
   const [collapsed, setCollapsed] = useState(false);
   const [user, setUser] = useState<any>(null);
@@ -212,7 +197,6 @@ function App() {
   const screens = useBreakpoint();
   const isMobile = !screens.md;
 
-  // Test the connection
   useEffect(() => {
     async function testConnection() {
       console.log('Testing Supabase connection...');
@@ -293,7 +277,6 @@ function App() {
     setUser(null);
   };
 
-  // Show connection error screen if database connection failed
   if (connectionStatus.status === 'error') {
     return (
       <ConfigProvider theme={{ algorithm: theme.defaultAlgorithm }}>
@@ -346,39 +329,11 @@ function App() {
             showIcon={false}
             style={{ marginBottom: 20 }}
           />
-          
-          <Alert
-            title="Troubleshooting Steps"
-            description={
-              <div style={{ textAlign: 'left' }}>
-                <h4>1. Check your .env file:</h4>
-                <pre style={{ background: '#f5f5f5', padding: 10, margin: '10px 0', borderRadius: 4, fontSize: '12px' }}>
-{`REACT_APP_SUPABASE_URL=https://hdcneyipanqhnfjetauv.supabase.co
-REACT_APP_SUPABASE_ANON_KEY=your_anon_key_here`}
-                </pre>
-                
-                <h4>2. Get your anon key:</h4>
-                <ul>
-                  <li>Go to <a href="https://app.supabase.com" target="_blank" rel="noreferrer">Supabase Dashboard</a></li>
-                  <li>Select your project</li>
-                  <li>Click Settings → API</li>
-                  <li>Copy the <strong>anon public</strong> key</li>
-                </ul>
-                
-                <h4>3. Restart development server:</h4>
-                <pre style={{ background: '#f5f5f5', padding: 10, margin: '10px 0', borderRadius: 4 }}>
-npm start
-                </pre>
-              </div>
-            }
-            type="info"
-          />
         </div>
       </ConfigProvider>
     );
   }
 
-  // Show loading screen while testing connection
   if (loading || connectionStatus.status === 'testing') {
     return (
       <div style={{ 
@@ -532,7 +487,6 @@ npm start
                         Get Started 
                       </Button>
                     </div>
-                    {/* PWA Install Prompt shows even on login screen */}
                     <div style={{ marginTop: 30 }}>
                       <PWAInstallPrompt />
                     </div>
@@ -546,12 +500,9 @@ npm start
                       <Route path="/images" element={<ImageManagementPage />} />
                       <Route path="/enroll" element={<EnrollmentPage />} />
                       <Route path="/attendance" element={<AttendancePage />} />
-                      {/* ADD THIS NEW ROUTE */}
                       <Route path="/attendance-management" element={<AttendanceManagementPage />} />
-                      
                       <Route path="*" element={<Navigate to="/" />} />
                     </Routes>
-                    {/* PWA Install Prompt shows when logged in */}
                     <PWAInstallPrompt />
                   </>
                 )}
