@@ -1,4 +1,4 @@
-// src/App.tsx
+// src/App.tsx - UPDATED VERSION
 import React, { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { Layout, Menu, Button, Spin, Alert, Typography, Space, ConfigProvider, theme, Card, Row, Col, Grid } from 'antd';
@@ -21,10 +21,11 @@ import {
   Download,
   UserPlus,
   QrCode,
-  Book
+  Book // Added Book icon
 } from 'lucide-react';
 import EnrollmentPage from './pages/EnrollmentPage';
 import AttendancePage from './pages/AttendancePage';
+import AttendanceManagementPage from './pages/AttendanceManagementPage'; // ADD THIS IMPORT
 import Dashboard from './pages/Dashboard';
 import ImageManagementPage from './pages/ImageManagementPage';
 import PWAInstallPrompt from './components/PWAInstallPrompt';
@@ -59,14 +60,17 @@ const menuItems = [
     icon: React.createElement(Camera, { size: 16 }),
     label: <Link to="/attendance">Take Attendance</Link>,
   },
-
+  // ADD THIS NEW MENU ITEM
   {
-    key: '6',
+    key: '4',
+    icon: React.createElement(Book, { size: 16 }),
+    label: <Link to="/attendance-management">Manage Attendance</Link>,
+  },
+  {
+    key: '5',
     icon: React.createElement(Database, { size: 16 }),
     label: <Link to="/sync">Sync Data</Link>,
   },
-
-
 ];
 
 // Home page cards component
@@ -75,8 +79,7 @@ const HomeCards = () => {
   const screens = useBreakpoint();
   const isMobile = !screens.md;
 
-  
-    const cards = [
+  const cards = [
     {
       key: 'enroll',
       title: 'Student Enrollment',
@@ -92,6 +95,15 @@ const HomeCards = () => {
       icon: <Camera size={isMobile ? 24 : 32} />,
       path: '/attendance',
       color: '#52c41a',
+    },
+    // ADD THIS NEW CARD
+    {
+      key: 'attendance-management',
+      title: 'Manage Attendance',
+      description: 'View, search and filter all records',
+      icon: <Book size={isMobile ? 24 : 32} />,
+      path: '/attendance-management',
+      color: '#722ed1',
     },
   ];
 
@@ -510,7 +522,6 @@ npm start
               }}>
                 {!user ? (
                   <div style={{ textAlign: 'center', padding: isMobile ? '20px' : '50px' }}>
-                    
                     <div style={{ marginTop: '20px' }}>
                       <Button 
                         type="primary" 
@@ -531,13 +542,12 @@ npm start
                     <BackButton />
                     <Routes>
                       <Route path="/" element={<HomeCards />} />
-                        <Route path="/dashboard" element={<Dashboard />} /> {/* Changed from HomeCards to Dashboard */}
+                      <Route path="/dashboard" element={<Dashboard />} />
                       <Route path="/images" element={<ImageManagementPage />} />
                       <Route path="/enroll" element={<EnrollmentPage />} />
                       <Route path="/attendance" element={<AttendancePage />} />
-                      
-                      
-                      
+                      {/* ADD THIS NEW ROUTE */}
+                      <Route path="/attendance-management" element={<AttendanceManagementPage />} />
                       
                       <Route path="*" element={<Navigate to="/" />} />
                     </Routes>
