@@ -249,7 +249,7 @@ const AttendancePage: React.FC = () => {
           />
         </div>
 
-        // Course Selection
+       
 {currentStep === 0 && (
   <div style={{ textAlign: 'center' }}>
     <div style={{ marginBottom: 24 }}>
