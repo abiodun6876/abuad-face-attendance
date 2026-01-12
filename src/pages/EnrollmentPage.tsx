@@ -771,18 +771,23 @@ const handleEnrollmentComplete = async (result: any) => {
           
           <div style={{ maxWidth: 640, margin: '0 auto' }}>
             {isCameraActive ? (
-              <FaceCamera
-  mode="enrollment"
-  student={{
-    id: studentData.matric_number || matricNumber,
-    name: studentData.name,
-    matric_number: studentData.matric_number || matricNumber,
-    level: studentData.level,
-    program_id: studentData.program_id
-  }}
-  onEnrollmentComplete={handleEnrollmentComplete}
-  autoCapture={false} // Disable auto-capture for enrollment
-/>
+            
+
+<div style={{ maxWidth: 800, margin: '0 auto', height: '600px' }}>
+  <FaceCamera
+    mode="enrollment"
+    student={{
+      id: studentData.matric_number || matricNumber,
+      name: studentData.name,
+      matric_number: studentData.matric_number || matricNumber,
+      level: studentData.level,
+      program_id: studentData.program_id,
+      gender: studentData.gender || 'male'
+    }}
+    onEnrollmentComplete={handleEnrollmentComplete}
+    autoCapture={false} // Disable auto-capture for enrollment
+  />
+</div>
             ) : (
               <Card>
                 <Camera size={48} style={{ marginBottom: 20, color: '#1890ff' }} />
