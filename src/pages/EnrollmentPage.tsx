@@ -653,7 +653,7 @@ const EnrollmentPage: React.FC = () => {
       icon: <BookOpen />,
     },
     {
-      title: window.innerWidth < 768 ? '' : 'Face Enrollment',
+      title: window.innerWidth < 768 ? '' : 'FaceEnrollment',
       icon: <Camera />,
     },
   ]}
