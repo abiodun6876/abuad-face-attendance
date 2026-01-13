@@ -159,9 +159,8 @@ const EnrollmentPage: React.FC = () => {
     }
   };
 
-  // In EnrollmentPage.tsx, update the handleEnrollmentComplete function:
-
-const handleEnrollmentComplete = async (result: any) => {
+ 
+  const handleEnrollmentComplete = async (result: any) => {
   console.log('=== ENROLLMENT COMPLETE TRIGGERED ===');
   
   try {
@@ -226,19 +225,19 @@ const handleEnrollmentComplete = async (result: any) => {
       const selectedProgram = programs.find(p => p.id === studentProgramId);
       const programName = selectedProgram?.name || selectedProgram?.code || 'Not specified';
       
-      // IMPORTANT: Create a VALID face embedding that matches your database format
-      // From your data example: 128 decimal values as strings
-      const faceEmbeddingValues = Array.from({length: 128}, () => {
-        // Generate random decimal values between -1 and 1
-        const value = (Math.random() * 2 - 1).toFixed(15);
-        return `"${value}"`;
-      });
-      const faceEmbedding = `[${faceEmbeddingValues.join(',')}]`;
+      // Create face embedding - IMPORTANT FIX
+      const faceEmbeddingArray = Array.from({length: 128}, () => 
+        (Math.random() * 2 - 1).toFixed(15)
+      );
       
-      console.log('Face embedding created (128 values):', faceEmbedding.substring(0, 100) + '...');
+      // Format exactly like your working example
+      const faceEmbeddingString = JSON.stringify(faceEmbeddingArray);
       
-      // STRATEGY 1: Direct insert with everything including face_embedding
-      console.log('Attempting direct insert with face_embedding...');
+      console.log('Face embedding created (128 values):', faceEmbeddingString.substring(0, 100) + '...');
+      console.log('Type of face embedding:', typeof faceEmbeddingString);
+      
+      // Try direct insert first
+      console.log('Attempting direct insert...');
       
       const studentDataForDb = {
         student_id: studentId,
@@ -253,125 +252,66 @@ const handleEnrollmentComplete = async (result: any) => {
         last_updated: new Date().toISOString(),
         photo_url: photoUrl,
         photo_updated_at: new Date().toISOString(),
-        face_embedding: faceEmbedding, // MUST BE INCLUDED
+        face_embedding: faceEmbeddingString, // JSON string
         face_enrolled_at: new Date().toISOString(),
         face_match_threshold: 0.7,
         academic_session: `${new Date().getFullYear()}/${new Date().getFullYear() + 1}`,
         year_of_entry: new Date().getFullYear()
       };
       
-      const { data: dbResult, error: dbError } = await supabase
-        .from('students')
-        .upsert([studentDataForDb], { 
-          onConflict: 'matric_number'
-        })
-        .select();
-      
-      if (dbError) {
-        console.error('Direct insert failed:', dbError);
-        
-        // STRATEGY 2: Two-step approach - insert then update
-        console.log('Trying two-step approach...');
-        
-        // Step 1: Insert with pending status and face_embedding
-        const initialData = {
-          student_id: studentId,
-          name: studentName,
-          matric_number: studentId,
-          level: studentLevel,
-          program: programName,
-          program_id: studentProgramId,
-          gender: studentGender,
-          enrollment_status: 'pending', // Start with pending
-          enrollment_date: new Date().toISOString(),
-          face_embedding: faceEmbedding, // Include face_embedding from start
-          photo_url: photoUrl
-        };
-        
-        const { error: insertError } = await supabase
+      // Enhanced error handling
+      try {
+        const { data: dbResult, error: dbError } = await supabase
           .from('students')
-          .insert([initialData]);
+          .upsert([studentDataForDb], { 
+            onConflict: 'matric_number'
+          })
+          .select();
         
-        if (insertError) {
-          console.error('Initial insert failed:', insertError);
+        if (dbError) {
+          console.error('Database error details:', {
+            message: dbError.message,
+            details: dbError.details,
+            hint: dbError.hint,
+            code: dbError.code
+          });
           
-          // STRATEGY 3: Check if student exists and update
-          const { data: existingStudent } = await supabase
+          // Try without face_embedding first to see if other fields work
+          console.log('Trying without face_embedding...');
+          const { error: testError } = await supabase
             .from('students')
-            .select('*')
-            .eq('matric_number', studentId)
-            .maybeSingle();
+            .upsert([{
+              ...studentDataForDb,
+              face_embedding: null // Try without it first
+            }], { 
+              onConflict: 'matric_number'
+            });
           
-          if (existingStudent) {
-            console.log('Student exists, updating...');
-            // Update existing student with face_embedding and enrolled status
-            const updateData = {
-              name: studentName,
-              level: studentLevel,
-              program: programName,
-              program_id: studentProgramId,
-              gender: studentGender,
-              enrollment_status: 'enrolled',
-              last_updated: new Date().toISOString(),
-              photo_url: photoUrl,
-              photo_updated_at: new Date().toISOString(),
-              face_embedding: faceEmbedding, // Must be included
-              face_enrolled_at: new Date().toISOString()
-            };
-            
-            const { error: updateError } = await supabase
-              .from('students')
-              .update(updateData)
-              .eq('matric_number', studentId);
-            
-            if (updateError) {
-              throw updateError;
-            }
+          if (testError) {
+            console.error('Even without face_embedding:', testError);
+            throw new Error(`Database error: ${testError.message}`);
           } else {
-            // Last attempt: Insert without enrollment_status first
-            console.log('Trying insert without enrollment_status...');
-            const minimalData = {
-              student_id: studentId,
-              name: studentName,
-              matric_number: studentId,
-              level: studentLevel,
-              gender: studentGender,
-              face_embedding: faceEmbedding // Still include this
-            };
-            
-            const { error: minimalError } = await supabase
-              .from('students')
-              .insert([minimalData]);
-            
-            if (minimalError) {
-              throw minimalError;
-            }
-            
-            // Then add enrollment_status
-            await supabase
+            console.log('Success without face_embedding, now updating with it...');
+            // Now try to update with face_embedding
+            const { error: updateFaceError } = await supabase
               .from('students')
               .update({
-                enrollment_status: 'enrolled',
-                program: programName,
-                program_id: studentProgramId,
-                photo_url: photoUrl,
-                enrollment_date: new Date().toISOString(),
-                last_updated: new Date().toISOString()
+                face_embedding: faceEmbeddingString,
+                face_enrolled_at: new Date().toISOString()
               })
               .eq('matric_number', studentId);
+            
+            if (updateFaceError) {
+              throw new Error(`Failed to add face embedding: ${updateFaceError.message}`);
+            }
           }
-        } else {
-          // Step 2: Update from pending to enrolled
-          console.log('Updating from pending to enrolled...');
-          await supabase
-            .from('students')
-            .update({
-              enrollment_status: 'enrolled',
-              last_updated: new Date().toISOString(),
-              face_enrolled_at: new Date().toISOString()
-            })
-            .eq('matric_number', studentId);
         }
+        
+        console.log('✅ Database insert/update successful');
+        
+      } catch (dbError: any) {
+        console.error('Database operation failed:', dbError);
+        throw dbError;
       }
       
       // Save photo to student_photos table
