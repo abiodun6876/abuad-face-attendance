@@ -691,12 +691,7 @@ const EnrollmentPage: React.FC = () => {
             </Button>
             {enrollmentResult?.success && (
               <>
-                <Button 
-                  size="large"
-                  onClick={() => window.location.href = '/students'}
-                >
-                  View All Students
-                </Button>
+                
                 <Button 
                   size="large"
                   type="primary"
