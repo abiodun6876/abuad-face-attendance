@@ -117,89 +117,146 @@ const AttendancePage: React.FC = () => {
     return result;
   };
 
-  // Find matching students
-  const findSimilarFaces = async (embedding: number[]) => {
+ const findSimilarFaces = async (embedding: number[]) => {
+  try {
+    console.log('=== FACE MATCHING STARTED ===');
+    console.log('Query embedding dimensions:', embedding.length);
+    
+    // Always work with 128D for consistency
+    const queryEmbedding = embedding.length === 512 
+      ? generateShortEmbedding(embedding) 
+      : embedding.slice(0, 128);
+    
+    console.log('Using 128D embedding for search');
+    
+    // OPTION 1: Use vector similarity search (if pgvector is set up)
+    // This is much faster for large datasets
     try {
-      console.log('Looking for matches with embedding length:', embedding.length);
+      const { data: vectorMatches, error: vectorError } = await supabase
+        .rpc('match_faces', {
+          query_embedding: queryEmbedding,
+          match_threshold: 0.5,
+          match_count: 5
+        });
       
-      // Generate short embedding for comparison with stored 128D embeddings
-      const shortEmbedding = generateShortEmbedding(embedding);
-      
-      // Get all enrolled students
-      const { data: students, error } = await supabase
-        .from('students')
-        .select('student_id, name, matric_number, face_embedding, face_embedding_vector')
-        .eq('enrollment_status', 'enrolled')
-        .not('face_embedding', 'is', null)
-        .limit(50);
-      
-      if (error || !students || students.length === 0) {
-        console.error('No students found:', error);
-        return [];
+      if (!vectorError && vectorMatches && vectorMatches.length > 0) {
+        console.log('Found matches via vector search:', vectorMatches.length);
+        return vectorMatches.map((match: any) => ({
+          studentId: match.student_id,
+          name: match.name,
+          matric_number: match.matric_number,
+          confidence: match.similarity
+        }));
       }
-      
-      console.log(`Found ${students.length} enrolled students`);
-      
-      const matches = [];
-      const capturedDescriptor = new Float32Array(embedding);
-      
-      // Compare with each student
-      for (const student of students) {
-        try {
-          let storedEmbedding: Float32Array | null = null;
-          
-          // Try to get embedding from student data
-          if (student.face_embedding_vector && Array.isArray(student.face_embedding_vector)) {
-            // Use 512D vector if available
-            storedEmbedding = new Float32Array(student.face_embedding_vector);
-            console.log(`Using 512D vector for ${student.name}`);
-          } else if (student.face_embedding && Array.isArray(student.face_embedding)) {
-            // Use 128D embedding (most common case)
-            storedEmbedding = new Float32Array(student.face_embedding);
-            console.log(`Using 128D embedding for ${student.name}`);
-          }
-          
-          if (!storedEmbedding) {
-            console.log(`No valid embedding for ${student.name}`);
-            continue;
-          }
-          
-          // Compare faces
-          const similarity = faceRecognition.compareFaces(capturedDescriptor, storedEmbedding);
-          
-          console.log(`Comparing with ${student.name}: ${similarity.toFixed(3)}`);
-          
-          // Adjust threshold based on embedding dimensions
-          const threshold = storedEmbedding.length === 512 ? 0.65 : 0.5;
-          
-          if (similarity > threshold) {
-            matches.push({
-              studentId: student.student_id,
-              name: student.name,
-              matric_number: student.matric_number,
-              confidence: similarity,
-              embeddingDimensions: storedEmbedding.length
-            });
-          }
-        } catch (error) {
-          console.error(`Error processing student ${student.student_id}:`, error);
-          continue;
-        }
-      }
-      
-      // Sort by confidence and return top matches
-      const sortedMatches = matches
-        .sort((a, b) => b.confidence - a.confidence)
-        .slice(0, 5);
-      
-      console.log('Total matches found:', sortedMatches.length);
-      return sortedMatches;
-      
-    } catch (error) {
-      console.error('Error in face matching:', error);
+    } catch (vectorErr) {
+      console.log('Vector search not available, falling back to manual search');
+    }
+    
+    // OPTION 2: Manual search (fallback)
+    console.log('Using manual face matching...');
+    
+    const { data: students, error } = await supabase
+      .from('students')
+      .select(`
+        student_id, 
+        name, 
+        matric_number, 
+        face_embedding,
+        face_embedding_vector,
+        face_match_threshold
+      `)
+      .eq('enrollment_status', 'enrolled')
+      .not('face_embedding', 'is', null);
+    
+    if (error) {
+      console.error('Error fetching students:', error);
       return [];
     }
-  };
+    
+    console.log(`Found ${students?.length || 0} enrolled students with embeddings`);
+    
+    const matches = [];
+    const queryVector = new Float32Array(queryEmbedding);
+    
+    for (const student of students || []) {
+      try {
+        let storedVector: Float32Array | null = null;
+        
+        // Try to get embedding from vector column first
+        if (student.face_embedding_vector) {
+          // Assuming face_embedding_vector is a vector type that returns array
+          // You might need to parse it depending on how supabase returns it
+          const vectorArray = JSON.parse(JSON.stringify(student.face_embedding_vector));
+          if (Array.isArray(vectorArray)) {
+            storedVector = new Float32Array(vectorArray);
+          }
+        }
+        
+        // Fall back to array column
+        if (!storedVector && student.face_embedding) {
+          storedVector = new Float32Array(student.face_embedding);
+        }
+        
+        if (!storedVector) {
+          console.log(`No valid embedding for ${student.name}`);
+          continue;
+        }
+        
+        console.log(`${student.name}: Stored dimensions = ${storedVector.length}`);
+        
+        // Ensure we're comparing same dimensions
+        let comparisonVector = storedVector;
+        if (storedVector.length !== queryVector.length) {
+          console.log(`Dimension mismatch for ${student.name}: stored=${storedVector.length}, query=${queryVector.length}`);
+          
+          if (storedVector.length === 512 && queryVector.length === 128) {
+            // Convert stored 512D to 128D
+            comparisonVector = new Float32Array(
+              generateShortEmbedding(Array.from(storedVector))
+            );
+          } else if (storedVector.length === 128 && queryVector.length === 512) {
+            // This shouldn't happen with our code
+            continue;
+          }
+        }
+        
+        const similarity = faceRecognition.compareFaces(queryVector, comparisonVector);
+        const threshold = student.face_match_threshold || 0.5;
+        
+        console.log(`${student.name}: ${similarity.toFixed(3)} (threshold: ${threshold})`);
+        
+        if (similarity > threshold) {
+          matches.push({
+            studentId: student.student_id,
+            name: student.name,
+            matric_number: student.matric_number,
+            confidence: similarity,
+            embeddingDimensions: comparisonVector.length
+          });
+        }
+      } catch (err) {
+        console.error(`Error processing ${student.name}:`, err);
+        continue;
+      }
+    }
+    
+    // Sort by confidence
+    const sortedMatches = matches
+      .sort((a, b) => b.confidence - a.confidence)
+      .slice(0, 5);
+    
+    console.log('Total matches found:', sortedMatches.length);
+    sortedMatches.forEach((match, index) => {
+      console.log(`${index + 1}. ${match.name}: ${(match.confidence * 100).toFixed(1)}%`);
+    });
+    
+    return sortedMatches;
+    
+  } catch (error) {
+    console.error('Face matching error:', error);
+    return [];
+  }
+};
 
   // Check existing attendance
   const checkExistingAttendance = async (studentId: string): Promise<boolean> => {
