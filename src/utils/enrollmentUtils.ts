@@ -30,129 +30,110 @@ export interface EnrollmentResult {
   };
   error?: string;
   faceDetected?: boolean;
+  message?: string;  // Add this line
   embeddingDimensions?: number;
 }
 
-export const enrollStudent = async (data: EnrollmentData): Promise<EnrollmentResult> => {
+export const enrollStudent = async (enrollmentData: EnrollmentData): Promise<EnrollmentResult> => {
   try {
-    console.log('Starting enrollment process...');
+    console.log('Starting enrollment for:', enrollmentData.name);
     
-    // 1. Check if student already exists
+    // First, check if student already exists
     const { data: existingStudent, error: checkError } = await supabase
       .from('students')
       .select('*')
-      .eq('matric_number', data.student_id)
+      .or(`matric_number.eq.${enrollmentData.student_id},student_id.eq.${enrollmentData.student_id}`)
       .single();
 
-    // If there's an error but it's not "no rows" error, throw it
-    if (checkError && checkError.code !== 'PGRST116') {
-      console.error('Database check error:', checkError);
-      throw new Error(`Database error: ${checkError.message}`);
-    }
-
-    // If student exists, return error
     if (existingStudent) {
       return {
         success: false,
-        error: `Student with matric number ${data.student_id} already exists`
+        error: 'Student with this matric number or student ID already exists.'
       };
     }
 
-    // 2. Extract face descriptor
-    console.log('Extracting face descriptor...');
-    const faceDescriptor = await faceRecognition.extractFaceDescriptor(data.photoData);
-    
-    if (!faceDescriptor) {
-      console.warn('No face detected. Proceeding without face data...');
-    } else {
-      console.log('Face descriptor extracted:', faceDescriptor.length, 'dimensions');
-    }
-
-    // 3. Prepare student data
-    const studentData = {
-      student_id: data.student_id,
-      name: data.name,
-      matric_number: data.student_id,
-      gender: data.gender,
-      program_name: data.program_name,
-      program_code: data.program_code,
-      level: data.level,
-      enrollment_status: 'enrolled',
-      enrollment_date: new Date().toISOString(),
-      ...(data.program_id && { program_id: data.program_id })
-    };
-
-    // 4. Save to database
-    console.log('Saving to database...', studentData);
-    const { data: newStudent, error: dbError } = await supabase
+    // Insert new student using Supabase client
+    const { data: student, error: insertError } = await supabase
       .from('students')
-      .insert([studentData])
+      .insert([
+        {
+          student_id: enrollmentData.student_id,
+          matric_number: enrollmentData.student_id,
+          name: enrollmentData.name,
+          gender: enrollmentData.gender,
+          program: enrollmentData.program_code,
+          program_name: enrollmentData.program_name,
+          level: enrollmentData.level,
+          photo_url: enrollmentData.photoData || null,
+          face_detected: true,
+          face_enrolled_at: new Date().toISOString(),
+          enrollment_status: 'enrolled',
+          enrollment_date: new Date().toISOString().split('T')[0], // Just the date part
+          is_active: true
+        }
+      ])
       .select()
       .single();
 
-    if (dbError) {
-      console.error('Database error:', dbError);
-      throw new Error(`Failed to save student: ${dbError.message}`);
-    }
-
-    console.log('Student saved to database:', newStudent);
-
-    // 5. Save face embedding if detected
-    let embeddingSaved = false;
-    if (faceDescriptor && newStudent) {
-      try {
-        console.log('Saving face embedding...');
-        
-        // Convert Float32Array to regular array for JSON storage
-        const embeddingArray = Array.from(faceDescriptor);
-        
-        // Save to database
-        const { error: embeddingError } = await supabase
-          .from('students')
-          .update({ 
-            face_embedding: embeddingArray,
-            last_face_update: new Date().toISOString()
-          })
-          .eq('id', newStudent.id);
-
-        if (embeddingError) {
-          console.warn('Failed to save face embedding to database:', embeddingError);
-        } else {
-          // Also save locally
-          faceRecognition.saveEmbeddingToLocal(data.student_id, faceDescriptor);
-          embeddingSaved = true;
-          console.log('Face embedding saved successfully');
+    if (insertError) {
+      console.error('Supabase insert error:', insertError);
+      
+      // Handle duplicate key errors
+      if (insertError.code === '23505') {
+        if (insertError.message.includes('students_matric_number_key')) {
+          return {
+            success: false,
+            error: 'Matric number already exists. Please generate a new one.'
+          };
         }
-      } catch (embeddingError) {
-        console.warn('Failed to save face embedding:', embeddingError);
+        if (insertError.message.includes('students_student_id_key')) {
+          return {
+            success: false,
+            error: 'Student ID already exists.'
+          };
+        }
       }
+      
+      return {
+        success: false,
+        error: `Database error: ${insertError.message}`
+      };
     }
 
-    // 6. Return success result
+    if (!student) {
+      return {
+        success: false,
+        error: 'Student record was not created.'
+      };
+    }
+
+    console.log('Student enrolled successfully:', student);
+
     return {
       success: true,
       student: {
-        id: newStudent.id,
-        student_id: newStudent.student_id,
-        name: newStudent.name,
-        matric_number: newStudent.matric_number,
-        gender: newStudent.gender,
-        program_name: newStudent.program_name,
-        program_code: newStudent.program_code,
-        level: newStudent.level,
-        enrollment_status: newStudent.enrollment_status,
-        enrollment_date: newStudent.enrollment_date,
-        has_face_embedding: embeddingSaved
+        id: student.id,
+        student_id: student.student_id,
+        name: student.name,
+        matric_number: student.matric_number,
+        gender: student.gender,
+        program_name: student.program_name,
+        program_code: student.program,
+        level: student.level,
+        enrollment_status: student.enrollment_status,
+        enrollment_date: student.enrollment_date,
+        has_face_embedding: student.face_embedding ? true : false
       },
-      faceDetected: !!faceDescriptor,
-      embeddingDimensions: faceDescriptor?.length
+      faceDetected: student.face_detected || false,
+      message: 'Student enrolled successfully'
     };
-
+    
   } catch (error: any) {
     console.error('Enrollment error:', error);
+    
     return {
       success: false,
-      error: error.message || 'Unknown error during enrollment'
+      error: `Unexpected error: ${error.message}`
     };
   }
 };
@@ -162,7 +143,7 @@ export const testEnrollment = async (): Promise<boolean> => {
   try {
     console.log('Testing enrollment connection...');
     
-    // Test database connection
+    // Test database connection using Supabase
     const { data, error } = await supabase
       .from('students')
       .select('count')
@@ -179,4 +160,19 @@ export const testEnrollment = async (): Promise<boolean> => {
     console.error('Test failed:', error);
     return false;
   }
+};
+
+// Optional: Function to test with a sample student
+export const testEnrollmentWithSample = async (): Promise<EnrollmentResult> => {
+  const sampleData: EnrollmentData = {
+    student_id: 'TEST/2026/9999',
+    name: 'Test Student',
+    gender: 'male',
+    program_code: 'CSC',
+    program_name: 'Computer Science',
+    level: 100,
+    photoData: 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k='
+  };
+  
+  return await enrollStudent(sampleData);
 };

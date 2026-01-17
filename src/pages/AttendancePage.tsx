@@ -101,52 +101,67 @@ const AttendancePage: React.FC = () => {
     }
   };
 
-  const markAttendance = async (studentId: string, studentName: string, matricNumber: string) => {
-    try {
-      setLoading(true);
-      
-      // 1. Get current date and time
-      const now = new Date();
-      const attendanceDate = now.toISOString().split('T')[0]; // YYYY-MM-DD
-      const attendanceTime = now.toTimeString().split(' ')[0]; // HH:MM:SS
-      
-      // 2. Save attendance to database
-      const { data, error } = await supabase
-        .from('attendance')
-        .insert([{
-          student_id: studentId,
-          matric_number: matricNumber,
-          name: studentName,
-          date: attendanceDate,
-          time: attendanceTime,
-          status: 'present',
-          method: 'face_recognition',
-          confidence: matches.find(m => m.studentId === studentId)?.confidence || 0
-        }])
-        .select()
-        .single();
+ const markAttendance = async (studentId: string, studentName: string, matricNumber: string) => {
+  try {
+    setLoading(true);
+    
+    // Get current date and time
+    const now = new Date();
+    const attendanceDate = now.toISOString().split('T')[0]; // YYYY-MM-DD
+    const attendanceTime = now.toTimeString().split(' ')[0]; // HH:MM:SS
+    
+    // First, check if attendance was already marked today
+    const { data: existingAttendance, error: checkError } = await supabase
+      .from('attendance')
+      .select('*')
+      .eq('matric_number', matricNumber)
+      .eq('date', attendanceDate)
+      .maybeSingle();
 
-      if (error) {
-        throw error;
-      }
-
-      message.success(`Attendance marked for ${studentName} at ${attendanceTime}`);
-      setAttendanceMarked(true);
-      
-      // 3. Reset after 3 seconds
-      setTimeout(() => {
-        setMatches([]);
-        setAttendanceMarked(false);
-        setCurrentPhoto(null);
-        setLoading(false);
-      }, 3000);
-      
-    } catch (error: any) {
-      console.error('Error marking attendance:', error);
-      message.error(`Failed to mark attendance: ${error.message}`);
+    if (existingAttendance) {
+      message.warning(`${studentName} already marked attendance today at ${existingAttendance.time}`);
       setLoading(false);
+      return;
     }
-  };
+
+    // Save attendance to database
+    const { data, error } = await supabase
+      .from('attendance')
+      .insert([{
+        student_id: studentId,
+        matric_number: matricNumber,
+        name: studentName,
+        date: attendanceDate,
+        time: attendanceTime,
+        status: 'present',
+        method: 'face_recognition',
+        confidence: matches.find(m => m.studentId === studentId)?.confidence || 0,
+        created_at: new Date().toISOString()
+      }])
+      .select()
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    message.success(`Attendance marked for ${studentName} at ${attendanceTime}`);
+    setAttendanceMarked(true);
+    
+    // Reset after 3 seconds
+    setTimeout(() => {
+      setMatches([]);
+      setAttendanceMarked(false);
+      setCurrentPhoto(null);
+      setLoading(false);
+    }, 3000);
+    
+  } catch (error: any) {
+    console.error('Error marking attendance:', error);
+    message.error(`Failed to mark attendance: ${error.message}`);
+    setLoading(false);
+  }
+};
 
   const retryCapture = () => {
     setMatches([]);
