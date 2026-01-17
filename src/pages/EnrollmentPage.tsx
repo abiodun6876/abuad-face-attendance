@@ -1,4 +1,4 @@
-// pages/EnrollmentPage.tsx
+// pages/EnrollmentPage.tsx - Fixed version
 import React, { useState, useEffect } from 'react';
 import { 
   Form, 
@@ -25,6 +25,7 @@ const EnrollmentPage: React.FC = () => {
   const [currentStep, setCurrentStep] = useState(0);
   const [loading, setLoading] = useState(false);
   const [enrollmentResult, setEnrollmentResult] = useState<any>(null);
+  const [formData, setFormData] = useState<any>({}); // Store form data
   const [form] = Form.useForm();
 
   // Initialize form values
@@ -36,34 +37,58 @@ const EnrollmentPage: React.FC = () => {
     });
   }, [form]);
 
+  // Save form data when moving to step 2
+  const goToFaceCapture = async () => {
+    try {
+      // Validate and get form values
+      const values = await form.validateFields();
+      console.log('Form validated, values:', values);
+      
+      // Save form data to state
+      setFormData(values);
+      
+      // Generate matric number if not provided
+      if (!values.matric_number) {
+        const newMatric = generateMatricNumber(values.program_code);
+        form.setFieldValue('matric_number', newMatric);
+        values.matric_number = newMatric;
+        setFormData({...values, matric_number: newMatric});
+      }
+      
+      setCurrentStep(1);
+      message.success('Student info saved. Ready for face capture.');
+    } catch (error: any) {
+      console.error('Form validation error:', error);
+      message.error('Please fill in all required fields correctly');
+    }
+  };
+
   const handleEnrollmentComplete = async (photoData: string) => {
     console.log('Enrollment photo captured, starting enrollment...');
+    console.log('Using form data:', formData);
+    
     setLoading(true);
     
     try {
-      const formValues = form.getFieldsValue();
-      console.log('Form values:', formValues);
-      
-      // Validate required fields
-      if (!formValues.name) {
-        throw new Error('Please enter student name');
+      // Validate required fields from saved form data
+      if (!formData.name) {
+        throw new Error('Student name not found. Please go back and enter student info.');
       }
       
-      // Generate matric number if not provided
-      if (!formValues.matric_number) {
-        const newMatric = generateMatricNumber(formValues.program_code);
-        form.setFieldValue('matric_number', newMatric);
-        formValues.matric_number = newMatric;
+      // Generate matric number if not provided (double-check)
+      if (!formData.matric_number) {
+        const newMatric = generateMatricNumber(formData.program_code);
+        formData.matric_number = newMatric;
       }
       
       const enrollmentData: EnrollmentData = {
-        student_id: formValues.matric_number,
-        name: formValues.name,
-        gender: formValues.gender,
-        program_id: formValues.program_code || 'CSC', // Use program code as ID
-        program_name: getProgramName(formValues.program_code),
-        program_code: formValues.program_code || 'CSC',
-        level: formValues.level,
+        student_id: formData.matric_number,
+        name: formData.name,
+        gender: formData.gender,
+        program_id: formData.program_code || 'CSC',
+        program_name: getProgramName(formData.program_code),
+        program_code: formData.program_code || 'CSC',
+        level: formData.level,
         photoData
       };
       
@@ -112,6 +137,7 @@ const EnrollmentPage: React.FC = () => {
 
   const resetForm = () => {
     form.resetFields();
+    setFormData({});
     // Reset to default values
     form.setFieldsValue({
       gender: 'male',
@@ -145,9 +171,7 @@ const EnrollmentPage: React.FC = () => {
           form={form} 
           layout="vertical" 
           initialValues={{ gender: 'male', level: 100, program_code: 'CSC' }}
-          onFinish={() => {
-            setCurrentStep(1);
-          }}
+          // Remove onFinish and use our custom handler
         >
           <Row gutter={16}>
             <Col span={24}>
@@ -231,7 +255,7 @@ const EnrollmentPage: React.FC = () => {
             <Button 
               type="primary" 
               size="large"
-              htmlType="submit"
+              onClick={goToFaceCapture} // Use custom handler
             >
               Continue to Face Capture
             </Button>
@@ -245,6 +269,29 @@ const EnrollmentPage: React.FC = () => {
       content: (
         <div style={{ textAlign: 'center' }}>
           <Title level={4} style={{ marginBottom: 16 }}>Face Enrollment</Title>
+          
+          {/* Show saved student info */}
+          {formData.name && (
+            <div style={{ 
+              backgroundColor: '#f0f9ff', 
+              padding: '12px 24px', 
+              borderRadius: 8,
+              marginBottom: 16,
+              border: '1px solid #91d5ff'
+            }}>
+              <Text strong>Student: </Text>
+              <Text>{formData.name}</Text>
+              <Text style={{ marginLeft: 16 }}>
+                <Text strong>Matric: </Text>
+                <Tag color="blue">{formData.matric_number || 'Not generated'}</Tag>
+              </Text>
+              <Text style={{ marginLeft: 16 }}>
+                <Text strong>Program: </Text>
+                <Tag color="purple">{formData.program_code}</Tag>
+              </Text>
+            </div>
+          )}
+          
           <Text type="secondary" style={{ marginBottom: 24, display: 'block' }}>
             Position student's face in the frame and click Capture Face
           </Text>
@@ -269,8 +316,7 @@ const EnrollmentPage: React.FC = () => {
             <Button
               type="dashed"
               onClick={async () => {
-                const formValues = form.getFieldsValue();
-                if (!formValues.name) {
+                if (!formData.name) {
                   message.error('Please fill in name first');
                   return;
                 }
@@ -288,7 +334,7 @@ const EnrollmentPage: React.FC = () => {
           
           <Space style={{ marginTop: 16 }}>
             <Button onClick={() => setCurrentStep(0)}>
-              Back
+              Back to Student Info
             </Button>
             <Text type="secondary">
               Make sure face is clearly visible
