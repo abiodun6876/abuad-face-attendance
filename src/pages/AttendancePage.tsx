@@ -12,7 +12,7 @@ import {
   Spin,
   Alert
 } from 'antd';
-import { Camera, CheckCircle, XCircle, User, Clock, Users, AlertCircle } from 'lucide-react';
+import { Camera, CheckCircle, XCircle, User, Clock, Users, AlertCircle, Play, StopCircle, Home, Pause } from 'lucide-react';
 import FaceCamera from '../components/FaceCamera';
 import faceRecognition from '../utils/faceRecognition';
 import { supabase } from '../lib/supabase';
@@ -36,8 +36,10 @@ const AttendancePage: React.FC = () => {
   const [presentToday, setPresentToday] = useState(0);
   const [showCamera, setShowCamera] = useState(false); // Start false until models load
   const [currentPhoto, setCurrentPhoto] = useState<string | null>(null);
+  const [autoScanEnabled, setAutoScanEnabled] = useState(true); // Auto-scan enabled by default
+  const [isScanning, setIsScanning] = useState(false); // Current scanning state
 
-  // Load face recognition models on component mount - Using your working logic
+  // Load face recognition models on component mount
   useEffect(() => {
     const loadModels = async () => {
       try {
@@ -79,17 +81,23 @@ const AttendancePage: React.FC = () => {
   };
 
   const handleAttendanceComplete = async (result: { success: boolean; photoData?: { base64: string } }) => {
+    // Don't process if auto-scan is disabled
+    if (!autoScanEnabled) {
+      return;
+    }
+
     if (!result.success || !result.photoData) {
       message.error('Failed to capture photo');
       return;
     }
 
-    // Check if models are loaded - Using your check
+    // Check if models are loaded
     if (!modelsLoaded) {
       message.error('Face recognition models not loaded yet. Please wait...');
       return;
     }
 
+    setIsScanning(true);
     setLoading(true);
     setProcessing(true);
     setScanCount(prev => prev + 1);
@@ -100,7 +108,7 @@ const AttendancePage: React.FC = () => {
     try {
       console.log('🔍 Finding face matches...');
       
-      // Check if there's a face in the image first - Using your logic
+      // Check if there's a face in the image first
       const faceDescriptor = await faceRecognition.extractFaceDescriptor(result.photoData.base64);
       
       if (!faceDescriptor) {
@@ -108,6 +116,7 @@ const AttendancePage: React.FC = () => {
         setTimeout(() => {
           setProcessing(false);
           setLoading(false);
+          setIsScanning(false);
           setShowCamera(true);
         }, 2000);
         return;
@@ -123,6 +132,7 @@ const AttendancePage: React.FC = () => {
         setTimeout(() => {
           setProcessing(false);
           setLoading(false);
+          setIsScanning(false);
           setShowCamera(true);
         }, 2000);
         return;
@@ -139,6 +149,7 @@ const AttendancePage: React.FC = () => {
         // Show manual confirmation for lower confidence
         setProcessing(false);
         setLoading(false);
+        setIsScanning(false);
       }
       
     } catch (error: any) {
@@ -146,6 +157,7 @@ const AttendancePage: React.FC = () => {
       message.error(`Error: ${error.message}`);
       setProcessing(false);
       setLoading(false);
+      setIsScanning(false);
       setShowCamera(true);
     }
   };
@@ -156,7 +168,7 @@ const AttendancePage: React.FC = () => {
       const attendanceDate = now.toISOString().split('T')[0];
       const attendanceTime = now.toTimeString().split(' ')[0];
       
-      // Check if already marked today - Using your logic
+      // Check if already marked today
       const { data: existingAttendance } = await supabase
         .from('attendance')
         .select('*')
@@ -206,6 +218,7 @@ const AttendancePage: React.FC = () => {
     setAttendanceMarked(false);
     setProcessing(false);
     setLoading(false);
+    setIsScanning(false);
     setCurrentPhoto(null);
     setShowCamera(true); // Show camera again
   };
@@ -214,6 +227,34 @@ const AttendancePage: React.FC = () => {
     if (!bestMatch) return;
     setProcessing(true);
     await autoMarkAttendance(bestMatch);
+  };
+
+  // Toggle auto-scan
+  const toggleAutoScan = () => {
+    const newState = !autoScanEnabled;
+    setAutoScanEnabled(newState);
+    setIsScanning(false);
+    message.info(`Auto-scan ${newState ? 'enabled' : 'disabled'}`);
+    
+    if (newState && showCamera) {
+      message.info('Auto-scan will begin capturing faces automatically');
+    }
+  };
+
+  // Start scanning manually
+  const startManualScan = () => {
+    if (!modelsLoaded) {
+      message.error('Models not loaded yet');
+      return;
+    }
+    
+    // Trigger camera capture manually
+    const captureButton = document.querySelector('[data-testid="capture-button"]');
+    if (captureButton) {
+      (captureButton as HTMLElement).click();
+    } else {
+      message.info('Please wait for camera to initialize');
+    }
   };
 
   // Get current time
@@ -281,8 +322,20 @@ const AttendancePage: React.FC = () => {
             zIndex: 10,
             borderBottom: '1px solid rgba(255, 255, 255, 0.1)'
           }}>
-            {/* Left side - Logo and Title */}
+            {/* Left side - Back button and Title */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <Button
+                type="text"
+                icon={<Home size={20} />}
+                onClick={() => window.location.href = '/'}
+                style={{ 
+                  color: 'white',
+                  padding: '8px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              />
               <div style={{ 
                 width: 40, 
                 height: 40, 
@@ -294,7 +347,12 @@ const AttendancePage: React.FC = () => {
               }}>
                 <Camera size={20} color="white" />
               </div>
-              
+              <div>
+                <Title level={3} style={{ margin: 0, color: 'white', fontWeight: 'bold' }}>ABUAD FACE AUTH</Title>
+                <Text style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: 12 }}>
+                  AFE Babalola University
+                </Text>
+              </div>
             </div>
             
             {/* Right side - Stats */}
@@ -320,7 +378,18 @@ const AttendancePage: React.FC = () => {
                 <Title level={2} style={{ margin: '4px 0 0 0', color: '#52c41a' }}>{presentToday}</Title>
               </div>
               
-              
+              <div style={{ textAlign: 'center' }}>
+                <Text style={{ 
+                  color: 'rgba(255, 255, 255, 0.7)', 
+                  fontSize: 12,
+                  fontWeight: '500',
+                  display: 'block',
+                  marginBottom: 4
+                }}>
+                  SCANS
+                </Text>
+                <Title level={2} style={{ margin: '4px 0 0 0', color: '#1890ff' }}>{scanCount}</Title>
+              </div>
               
               <div style={{ textAlign: 'center', minWidth: 60 }}>
                 <Clock size={16} color="rgba(255, 255, 255, 0.7)" style={{ marginBottom: 4 }} />
@@ -352,7 +421,7 @@ const AttendancePage: React.FC = () => {
               <FaceCamera
                 mode="attendance"
                 onAttendanceComplete={handleAttendanceComplete}
-                autoCapture={true}
+                autoCapture={autoScanEnabled}
                 captureInterval={2000}
                 loading={loading}
               />
@@ -415,9 +484,15 @@ const AttendancePage: React.FC = () => {
               }}>
                 {/* Left side - Mode Info */}
                 <div>
-                  
                   <Text style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: 14, marginLeft: 16 }}>
-                    Camera: <Tag color="green" style={{ marginLeft: 4 }}>Active</Tag>
+                    Camera: <Tag color={autoScanEnabled ? "green" : "red"} style={{ marginLeft: 4 }}>
+                      {autoScanEnabled ? "Active" : "Paused"}
+                    </Tag>
+                  </Text>
+                  <Text style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: 14, marginLeft: 16 }}>
+                    Auto-Scan: <Tag color={autoScanEnabled ? "green" : "red"} style={{ marginLeft: 4 }}>
+                      {autoScanEnabled ? "ON" : "OFF"}
+                    </Tag>
                   </Text>
                 </div>
                 
@@ -425,22 +500,30 @@ const AttendancePage: React.FC = () => {
                 <div style={{ textAlign: 'center' }}>
                   <Space direction="vertical" size="small">
                     <Badge 
-                      status="success"
+                      status={autoScanEnabled ? "success" : "warning"}
                       text={
                         <Text style={{ 
-                          color: '#52c41a',
+                          color: autoScanEnabled ? '#52c41a' : '#faad14',
                           fontSize: 16,
                           fontWeight: 'bold'
                         }}>
-                          READY
+                          {autoScanEnabled ? "READY" : "PAUSED"}
                         </Text>
                       } 
                     />
-                   
                   </Space>
                 </div>
                 
-                
+                {/* Right side - Instruction */}
+                <Text style={{ 
+                  color: 'rgba(255, 255, 255, 0.7)', 
+                  fontSize: 16,
+                  fontWeight: '500'
+                }}>
+                  {autoScanEnabled 
+                    ? "Position face within the circle" 
+                    : "Auto-scan paused. Click Start to scan"}
+                </Text>
               </div>
             </div>
           </div>
@@ -456,11 +539,51 @@ const AttendancePage: React.FC = () => {
           }}>
             <div>
               <Text style={{ color: 'rgba(255, 255, 255, 0.7)' }}>
-                J-SCAN: <Tag color="green" style={{ marginLeft: 4 }}>ON</Tag>
+                Status: <Tag color={autoScanEnabled ? "success" : "warning"} style={{ marginLeft: 4 }}>
+                  {autoScanEnabled ? "Auto-Scanning" : "Manual Mode"}
+                </Tag>
               </Text>
             </div>
             
-           
+            {/* Control Buttons */}
+            <Space>
+              {autoScanEnabled ? (
+                <Button
+                  type="primary"
+                  danger
+                  onClick={toggleAutoScan}
+                  icon={<StopCircle size={16} />}
+                  size="large"
+                >
+                  Stop Auto-Scan
+                </Button>
+              ) : (
+                <>
+                  <Button
+                    type="primary"
+                    onClick={toggleAutoScan}
+                    icon={<Play size={16} />}
+                    size="large"
+                  >
+                    Start Auto-Scan
+                  </Button>
+                  <Button
+                    type="default"
+                    onClick={startManualScan}
+                    icon={<Camera size={16} />}
+                    size="large"
+                    style={{ 
+                      backgroundColor: 'transparent',
+                      borderColor: 'rgba(255, 255, 255, 0.3)',
+                      color: 'white'
+                    }}
+                    loading={isScanning}
+                  >
+                    Scan Now
+                  </Button>
+                </>
+              )}
+            </Space>
           </div>
         </div>
       )}
@@ -472,7 +595,8 @@ const AttendancePage: React.FC = () => {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          padding: 24
+          padding: 24,
+          backgroundColor: '#0a0e17'
         }}>
           {processing ? (
             <div style={{ textAlign: 'center' }}>
@@ -600,7 +724,32 @@ const AttendancePage: React.FC = () => {
                 </Tag>
               </div>
 
-              
+              {/* Action Buttons */}
+              <Space size="large" style={{ width: '100%', justifyContent: 'center' }}>
+                <Button
+                  size="large"
+                  onClick={resetToCamera}
+                  style={{ 
+                    height: 50, 
+                    padding: '0 32px',
+                    backgroundColor: 'transparent',
+                    borderColor: 'rgba(255, 255, 255, 0.3)',
+                    color: 'white'
+                  }}
+                >
+                  Back to Camera
+                </Button>
+                <Button
+                  type="primary"
+                  size="large"
+                  onClick={manualConfirmAttendance}
+                  icon={<CheckCircle size={20} />}
+                  style={{ height: 50, padding: '0 32px' }}
+                  loading={processing}
+                >
+                  Confirm Attendance
+                </Button>
+              </Space>
             </div>
           ) : (
             <div style={{ textAlign: 'center' }}>
@@ -623,8 +772,26 @@ const AttendancePage: React.FC = () => {
                 Face not recognized in database
               </Text>
               <Space>
-               
-                
+                <Button
+                  type="primary"
+                  size="large"
+                  onClick={resetToCamera}
+                  icon={<Camera size={20} />}
+                >
+                  Try Again
+                </Button>
+                <Button
+                  size="large"
+                  onClick={() => window.location.href = '/enrollment'}
+                  icon={<User size={20} />}
+                  style={{ 
+                    backgroundColor: 'transparent',
+                    borderColor: 'rgba(255, 255, 255, 0.3)',
+                    color: 'white'
+                  }}
+                >
+                  Enroll Student
+                </Button>
               </Space>
             </div>
           )}
