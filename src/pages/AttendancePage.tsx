@@ -8,20 +8,35 @@ import {
   Badge,
   Space,
   Tag,
-  Spin
+  Spin,
+  Select,
+  Modal,
+  Input
 } from 'antd';
-import { Camera, CheckCircle, XCircle, Play, StopCircle } from 'lucide-react';
+import { Camera, CheckCircle, XCircle, Play, StopCircle, ArrowLeft, Book, Search } from 'lucide-react';
 import FaceCamera from '../components/FaceCamera';
 import faceRecognition from '../utils/faceRecognition';
 import { supabase } from '../lib/supabase';
 
 const { Title, Text } = Typography;
+const { Option } = Select;
+const { Search: AntSearch } = Input;
 
 interface MatchResult {
   studentId: string;
   name: string;
   matric_number: string;
   confidence: number;
+}
+
+interface Course {
+  id: string;
+  code: string;
+  title: string;
+  level: number;
+  semester: number;
+  credit_units: number;
+  is_core: boolean;
 }
 
 const AttendancePage: React.FC = () => {
@@ -34,6 +49,12 @@ const AttendancePage: React.FC = () => {
   const [showCamera, setShowCamera] = useState(false);
   const [autoScanEnabled, setAutoScanEnabled] = useState(false); // Start with auto-scan disabled
   const [isScanning, setIsScanning] = useState(false);
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [filteredCourses, setFilteredCourses] = useState<Course[]>([]);
+  const [selectedCourse, setSelectedCourse] = useState<string>('');
+  const [showCourseModal, setShowCourseModal] = useState(false);
+  const [loadingCourses, setLoadingCourses] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Load face recognition models
   useEffect(() => {
@@ -47,7 +68,9 @@ const AttendancePage: React.FC = () => {
         setModelsLoaded(true);
         console.log('Face models loaded successfully');
         
-        setShowCamera(true);
+        // Show course selection modal first
+        setShowCourseModal(true);
+        loadCourses();
         loadTodayCount();
       } catch (error) {
         console.error('Failed to load face models:', error);
@@ -73,8 +96,62 @@ const AttendancePage: React.FC = () => {
     }
   };
 
+  // Load courses from database
+  const loadCourses = async () => {
+    try {
+      setLoadingCourses(true);
+      console.log('Fetching courses...');
+      
+      const { data, error } = await supabase
+        .from('courses')
+        .select('id, code, title, level, semester, credit_units, is_core')
+        .eq('is_active', true)
+        .order('code');
+
+      if (error) {
+        console.error('Error fetching courses:', error);
+        message.error('Failed to load courses');
+        return;
+      }
+
+      console.log('Courses loaded:', data?.length || 0, 'courses');
+      const coursesData = data || [];
+      setCourses(coursesData);
+      setFilteredCourses(coursesData);
+      
+    } catch (error) {
+      console.error('Error loading courses:', error);
+      message.error('Failed to load courses');
+    } finally {
+      setLoadingCourses(false);
+    }
+  };
+
+  // Filter courses based on search query
+  const filterCourses = (query: string) => {
+    setSearchQuery(query);
+    if (!query.trim()) {
+      setFilteredCourses(courses);
+      return;
+    }
+    
+    const filtered = courses.filter(course => 
+      course.code.toLowerCase().includes(query.toLowerCase()) ||
+      course.title.toLowerCase().includes(query.toLowerCase()) ||
+      course.level.toString().includes(query)
+    );
+    
+    setFilteredCourses(filtered);
+  };
+
   const handleAttendanceComplete = async (result: { success: boolean; photoData?: { base64: string } }) => {
     if (!autoScanEnabled) {
+      return;
+    }
+
+    if (!selectedCourse) {
+      message.error('Please select a course first');
+      setAutoScanEnabled(false);
       return;
     }
 
@@ -144,24 +221,66 @@ const AttendancePage: React.FC = () => {
 
   const autoMarkAttendance = async (match: MatchResult) => {
     try {
+      if (!selectedCourse) {
+        message.error('No course selected');
+        return;
+      }
+
       const now = new Date();
       const attendanceDate = now.toISOString().split('T')[0];
       const attendanceTime = now.toTimeString().split(' ')[0];
       
+      // Get selected course details
+      const selectedCourseData = courses.find(c => c.code === selectedCourse);
+      if (!selectedCourseData) {
+        message.error('Selected course not found');
+        return;
+      }
+
+      // Check if student already marked attendance for this course today
       const { data: existingAttendance } = await supabase
         .from('attendance')
         .select('*')
         .eq('matric_number', match.matric_number)
         .eq('date', attendanceDate)
+        .eq('course_code', selectedCourse)
         .maybeSingle();
 
       if (existingAttendance) {
-        message.warning(`${match.name} already marked today`);
+        message.warning(`${match.name} already marked attendance for ${selectedCourse} today at ${existingAttendance.time}`);
         setAttendanceMarked(true);
         setTimeout(() => resetToCamera(), 3000);
         return;
       }
 
+      // Get additional student info if available
+      let studentInfo = {
+        faculty: '',
+        department: '',
+        program: '',
+        level: ''
+      };
+
+      try {
+        const { data: studentData } = await supabase
+          .from('students')
+          .select('faculty, department, program, level')
+          .eq('matric_number', match.matric_number)
+          .maybeSingle();
+
+        if (studentData) {
+          studentInfo = {
+            faculty: studentData.faculty || '',
+            department: studentData.department || '',
+            program: studentData.program || '',
+            level: studentData.level || ''
+          };
+        }
+      } catch (error) {
+        console.error('Error fetching student info:', error);
+      }
+
+      // Mark attendance
       const { error } = await supabase
         .from('attendance')
         .insert([{
@@ -173,12 +292,20 @@ const AttendancePage: React.FC = () => {
           status: 'present',
           method: 'face_recognition',
           confidence: match.confidence,
+          course_code: selectedCourse,
+          course_name: selectedCourseData.title,
+          faculty: studentInfo.faculty,
+          department: studentInfo.department,
+          program: studentInfo.program,
+          level: studentInfo.level,
+          session: `${now.getFullYear()}/${now.getFullYear() + 1}`,
+          semester: selectedCourseData.semester || 1,
           created_at: now.toISOString()
         }]);
 
       if (error) throw error;
 
-      message.success(`✅ ${match.name}`);
+      message.success(`✅ ${match.name} marked for ${selectedCourse}`);
       setAttendanceMarked(true);
       setPresentToday(prev => prev + 1);
       
@@ -202,10 +329,35 @@ const AttendancePage: React.FC = () => {
 
   // Toggle auto-scan
   const toggleAutoScan = () => {
+    if (!selectedCourse) {
+      message.error('Please select a course first');
+      return;
+    }
+
     const newState = !autoScanEnabled;
     setAutoScanEnabled(newState);
     setIsScanning(false);
-    message.info(`Auto-scan ${newState ? 'started' : 'stopped'}`);
+    message.info(`Auto-scan ${newState ? 'started' : 'stopped'} for ${selectedCourse}`);
+  };
+
+  // Handle course selection
+  const handleCourseSelect = (value: string) => {
+    setSelectedCourse(value);
+    const selected = courses.find(c => c.code === value);
+    if (selected) {
+      message.info(`Selected: ${selected.code} - ${selected.title}`);
+    }
+  };
+
+  // Start scanning with selected course
+  const startScanning = () => {
+    if (!selectedCourse) {
+      message.error('Please select a course first');
+      return;
+    }
+    
+    setShowCourseModal(false);
+    setShowCamera(true);
   };
 
   return (
@@ -239,14 +391,246 @@ const AttendancePage: React.FC = () => {
         </div>
       )}
 
+      // Course Selection Modal section - corrected
+{showCourseModal && modelsLoaded && (
+  <Modal
+    title={
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <Book size={20} />
+        <span>Select Course for Attendance</span>
+      </div>
+    }
+    open={showCourseModal}
+    onCancel={() => {
+      setShowCourseModal(false);
+      window.location.href = '/';
+    }}
+    footer={[
+      <Button 
+        key="back" 
+        onClick={() => window.location.href = '/'}
+        style={{ borderColor: 'rgba(255, 255, 255, 0.3)', color: 'white' }}
+      >
+        Cancel
+      </Button>,
+      <Button 
+        key="submit" 
+        type="primary" 
+        onClick={startScanning}
+        disabled={!selectedCourse || loadingCourses}
+        loading={loadingCourses}
+      >
+        Start Attendance
+      </Button>
+    ]}
+    centered
+    width={450}
+    styles={{
+      body: { 
+        backgroundColor: 'rgba(26, 34, 53, 0.95)',
+        padding: '24px',
+        color: 'white',
+        borderRadius: '0 0 12px 12px'
+      },
+      header: { 
+        backgroundColor: 'rgba(26, 34, 53, 0.95)',
+        borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+        color: 'white',
+        borderRadius: '12px 12px 0 0',
+        marginBottom: 0
+      },
+      footer: { 
+        backgroundColor: 'rgba(26, 34, 53, 0.95)',
+        borderTop: '1px solid rgba(255, 255, 255, 0.1)',
+        borderRadius: '0 0 12px 12px',
+        marginTop: 0
+      },
+      mask: {
+        backgroundColor: 'rgba(0, 0, 0, 0.7)'
+      }
+    }}
+    style={{
+      borderRadius: '12px',
+      overflow: 'hidden'
+    }}
+  >
+    <div style={{ marginBottom: 20 }}>
+      {/* Search Input */}
+      <div style={{ marginBottom: 16 }}>
+        <AntSearch
+          placeholder="Search courses by code or title..."
+          allowClear
+          onChange={(e) => filterCourses(e.target.value)}
+          onSearch={filterCourses}
+          style={{ marginBottom: 12 }}
+          prefix={<Search size={16} />}
+        />
+        
+        {searchQuery && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Text style={{ color: 'rgba(255, 255, 255, 0.6)', fontSize: 12 }}>
+              Found {filteredCourses.length} course{filteredCourses.length !== 1 ? 's' : ''}
+            </Text>
+            {filteredCourses.length === 0 && (
+              <Button 
+                type="link" 
+                size="small" 
+                onClick={() => filterCourses('')}
+                style={{ color: '#1890ff', padding: 0 }}
+              >
+                Clear search
+              </Button>
+            )}
+          </div>
+        )}
+      </div>
+
+      <Text style={{ color: 'rgba(255, 255, 255, 0.8)', marginBottom: 8, display: 'block' }}>
+        Select Course
+      </Text>
+      <Select
+        placeholder="Choose a course..."
+        style={{ width: '100%' }}
+        onChange={handleCourseSelect}
+        value={selectedCourse}
+        loading={loadingCourses}
+        showSearch
+        filterOption={false}
+        dropdownStyle={{ 
+          backgroundColor: '#1a2235',
+          border: '1px solid rgba(255, 255, 255, 0.2)',
+          maxHeight: 300
+        }}
+        dropdownRender={(menu) => (
+          <>
+            <div style={{ 
+              padding: '8px 12px', 
+              borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+              backgroundColor: '#1a2235'
+            }}>
+              <Text style={{ color: 'rgba(255, 255, 255, 0.6)', fontSize: 12 }}>
+                Showing {filteredCourses.length} of {courses.length} courses
+              </Text>
+            </div>
+            {menu}
+          </>
+        )}
+      >
+        {filteredCourses.length > 0 ? (
+          filteredCourses.map((course) => (
+            <Option 
+              key={course.id} 
+              value={course.code}
+              style={{ 
+                backgroundColor: '#1a2235',
+                color: 'white',
+                padding: '12px',
+                borderBottom: '1px solid rgba(255, 255, 255, 0.05)'
+              }}
+            >
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <Text strong style={{ color: 'white', fontSize: 14 }}>
+                    {course.code}
+                  </Text>
+                  <Tag 
+                    color={course.is_core ? "blue" : "purple"} 
+                    style={{ fontSize: 10, padding: '2px 6px', margin: 0 }}
+                  >
+                    {course.is_core ? "Core" : "Elective"}
+                  </Tag>
+                </div>
+                <Text style={{ 
+                  color: 'rgba(255, 255, 255, 0.7)', 
+                  fontSize: 12,
+                  marginTop: 4
+                }}>
+                  {course.title}
+                </Text>
+                <div style={{ 
+                  display: 'flex', 
+                  gap: 12, 
+                  marginTop: 8,
+                  fontSize: 11,
+                  color: 'rgba(255, 255, 255, 0.5)'
+                }}>
+                  <span>Level {course.level}</span>
+                  <span>Semester {course.semester}</span>
+                  <span>{course.credit_units} CU</span>
+                </div>
+              </div>
+            </Option>
+          ))
+        ) : (
+          <Option disabled value="no-results">
+            <div style={{ 
+              textAlign: 'center', 
+              padding: '20px',
+              color: 'rgba(255, 255, 255, 0.6)'
+            }}>
+              <Search size={24} style={{ marginBottom: 8, opacity: 0.5 }} />
+              <div>No courses found for "{searchQuery}"</div>
+              <Button 
+                type="link" 
+                onClick={() => filterCourses('')}
+                style={{ 
+                  color: '#1890ff', 
+                  marginTop: 8,
+                  fontSize: 12 
+                }}
+              >
+                View all courses
+              </Button>
+            </div>
+          </Option>
+        )}
+      </Select>
+    </div>
+
+    {selectedCourse && (
+      <div style={{ 
+        backgroundColor: 'rgba(24, 144, 255, 0.1)',
+        borderRadius: 8,
+        padding: 12,
+        marginTop: 16,
+        border: '1px solid rgba(24, 144, 255, 0.3)'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+          <div style={{ 
+            width: 20, 
+            height: 20, 
+            borderRadius: '50%', 
+            backgroundColor: '#1890ff',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0
+          }}>
+            <CheckCircle size={12} color="white" />
+          </div>
+          <div>
+            <Text strong style={{ color: 'rgba(255, 255, 255, 0.9)', fontSize: 13, display: 'block' }}>
+              Selected: {selectedCourse}
+            </Text>
+            <Text style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: 12, marginTop: 4 }}>
+              {courses.find(c => c.code === selectedCourse)?.title}
+            </Text>
+            
+          </div>
+        </div>
+      </div>
+    )}
+  </Modal>
+)}
+
       {/* Camera View */}
-      {showCamera && modelsLoaded && (
+      {showCamera && modelsLoaded && !showCourseModal && (
         <div style={{ 
           height: '100vh',
           display: 'flex',
           flexDirection: 'column'
         }}>
-          {/* Top Bar - Minimal */}
+          {/* Top Bar */}
           <div style={{ 
             padding: '12px 16px',
             backgroundColor: 'rgba(0, 0, 0, 0.9)',
@@ -256,19 +640,43 @@ const AttendancePage: React.FC = () => {
             zIndex: 10,
             borderBottom: '1px solid rgba(255, 255, 255, 0.1)'
           }}>
-            {/* Left - Status Indicator */}
-            <Badge 
-              status={autoScanEnabled ? "success" : "warning"}
-              text={
+            {/* Left - Back Button and Course Info */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <Button
+                type="text"
+                icon={<ArrowLeft size={18} />}
+                onClick={() => window.location.href = '/'}
+                style={{ 
+                  color: 'white',
+                  padding: '4px 8px',
+                  minWidth: 'auto'
+                }}
+              />
+              
+              {/* Course Info */}
+              <div style={{ maxWidth: 120 }}>
                 <Text style={{ 
-                  color: autoScanEnabled ? '#52c41a' : '#faad14',
+                  color: '#1890ff', 
                   fontSize: 12,
-                  fontWeight: 'bold'
+                  fontWeight: 'bold',
+                  display: 'block',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis'
                 }}>
-                  {autoScanEnabled ? "SCANNING" : "READY"}
+                  {selectedCourse}
                 </Text>
-              } 
-            />
+                <Text style={{ 
+                  color: 'rgba(255, 255, 255, 0.7)', 
+                  fontSize: 10,
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis'
+                }}>
+                  {courses.find(c => c.code === selectedCourse)?.title}
+                </Text>
+              </div>
+            </div>
 
             {/* Center - Attendance Counter Square */}
             <div style={{ 
@@ -296,7 +704,7 @@ const AttendancePage: React.FC = () => {
                 fontSize: 10,
                 marginTop: 2
               }}>
-                PRESENT
+                TODAY
               </Text>
             </div>
 
@@ -335,7 +743,7 @@ const AttendancePage: React.FC = () => {
             </Space>
           </div>
 
-          {/* Main Camera Area - No scrolling */}
+          {/* Main Camera Area */}
           <div style={{ 
             flex: 1,
             position: 'relative',
@@ -447,10 +855,17 @@ const AttendancePage: React.FC = () => {
                 {/* Left - Status */}
                 <Space>
                   <Tag color={autoScanEnabled ? "green" : "default"} style={{ margin: 0, fontSize: 11 }}>
-                    {autoScanEnabled ? "AUTO ON" : "AUTO OFF"}
+                    {autoScanEnabled ? "SCANNING" : "READY"}
                   </Tag>
-                  <Tag color={modelsLoaded ? "success" : "warning"} style={{ margin: 0, fontSize: 11 }}>
-                    {modelsLoaded ? "READY" : "LOADING"}
+                  <Tag color="blue" style={{ margin: 0, fontSize: 11, maxWidth: 60 }}>
+                    <span style={{ 
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      display: 'block'
+                    }}>
+                      {selectedCourse || "NO COURSE"}
+                    </span>
                   </Tag>
                 </Space>
 
@@ -458,7 +873,9 @@ const AttendancePage: React.FC = () => {
                 <Text style={{ 
                   color: 'rgba(255, 255, 255, 0.7)', 
                   fontSize: 12,
-                  fontWeight: '500'
+                  fontWeight: '500',
+                  maxWidth: 120,
+                  textAlign: 'center'
                 }}>
                   {autoScanEnabled ? "Face detection active" : "Press START to begin"}
                 </Text>
@@ -471,8 +888,8 @@ const AttendancePage: React.FC = () => {
         </div>
       )}
 
-      {/* Processing/Results View - No scrolling */}
-      {!showCamera && modelsLoaded && (
+      {/* Processing/Results View */}
+      {!showCamera && modelsLoaded && !showCourseModal && (
         <div style={{ 
           height: '100vh',
           display: 'flex',
@@ -509,7 +926,7 @@ const AttendancePage: React.FC = () => {
                 PROCESSING...
               </Title>
               <Text style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: 14 }}>
-                Recognizing face
+                Recognizing face for {selectedCourse}
               </Text>
             </div>
           ) : attendanceMarked ? (
@@ -535,9 +952,14 @@ const AttendancePage: React.FC = () => {
                   <Text style={{ color: 'rgba(255, 255, 255, 0.9)', fontSize: 18, marginBottom: 4 }}>
                     {bestMatch.name}
                   </Text>
-                  <Tag color="blue" style={{ fontSize: 14, padding: '6px 12px', marginBottom: 16 }}>
+                  <Tag color="blue" style={{ fontSize: 14, padding: '6px 12px', marginBottom: 8 }}>
                     {bestMatch.matric_number}
                   </Tag>
+                  <div style={{ marginBottom: 16 }}>
+                    <Tag color="green" style={{ fontSize: 12, padding: '4px 8px' }}>
+                      {selectedCourse}
+                    </Tag>
+                  </div>
                 </>
               )}
               <Text style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: 14 }}>
