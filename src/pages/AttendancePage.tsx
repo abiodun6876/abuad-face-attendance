@@ -391,7 +391,7 @@ const AttendancePage: React.FC = () => {
         </div>
       )}
 
-      // Course Selection Modal section - corrected
+      
 {showCourseModal && modelsLoaded && (
   <Modal
     title={
