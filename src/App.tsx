@@ -1,4 +1,4 @@
-// src/App.tsx - WITH BACK BUTTONS
+// src/App.tsx - WITH BACK BUTTONS (MODIFIED)
 import React, { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Spin, Alert, Typography, Space, ConfigProvider, theme, Card, Row, Col, Button } from 'antd';
@@ -301,11 +301,8 @@ function App() {
                 <EnrollmentPage />
               </PageWrapper>
             } />
-            <Route path="/attendance" element={
-              <PageWrapper>
-                <AttendancePage />
-              </PageWrapper>
-            } />
+            {/* Attendance page renders without PageWrapper */}
+            <Route path="/attendance" element={<AttendancePage />} />
             <Route path="/attendance-management" element={
               <PageWrapper>
                 <AttendanceManagementPage />
