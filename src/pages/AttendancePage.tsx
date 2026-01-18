@@ -8,10 +8,9 @@ import {
   Badge,
   Space,
   Tag,
-  Spin,
-  Alert
+  Spin
 } from 'antd';
-import { Camera, CheckCircle, XCircle, Play, StopCircle, Home } from 'lucide-react';
+import { Camera, CheckCircle, XCircle, Play, StopCircle } from 'lucide-react';
 import FaceCamera from '../components/FaceCamera';
 import faceRecognition from '../utils/faceRecognition';
 import { supabase } from '../lib/supabase';
@@ -31,10 +30,9 @@ const AttendancePage: React.FC = () => {
   const [bestMatch, setBestMatch] = useState<MatchResult | null>(null);
   const [attendanceMarked, setAttendanceMarked] = useState(false);
   const [modelsLoaded, setModelsLoaded] = useState(false);
-  const [scanCount, setScanCount] = useState(0);
   const [presentToday, setPresentToday] = useState(0);
   const [showCamera, setShowCamera] = useState(false);
-  const [autoScanEnabled, setAutoScanEnabled] = useState(true);
+  const [autoScanEnabled, setAutoScanEnabled] = useState(false); // Start with auto-scan disabled
   const [isScanning, setIsScanning] = useState(false);
 
   // Load face recognition models
@@ -93,7 +91,6 @@ const AttendancePage: React.FC = () => {
     setIsScanning(true);
     setLoading(true);
     setProcessing(true);
-    setScanCount(prev => prev + 1);
     setBestMatch(null);
     setShowCamera(false);
 
@@ -208,14 +205,8 @@ const AttendancePage: React.FC = () => {
     const newState = !autoScanEnabled;
     setAutoScanEnabled(newState);
     setIsScanning(false);
-    message.info(`Auto-scan ${newState ? 'enabled' : 'disabled'}`);
+    message.info(`Auto-scan ${newState ? 'started' : 'stopped'}`);
   };
-
-  // Get current time
-  const currentTime = new Date().toLocaleTimeString([], { 
-    hour: '2-digit', 
-    minute: '2-digit' 
-  });
 
   return (
     <div style={{ 
@@ -223,7 +214,8 @@ const AttendancePage: React.FC = () => {
       backgroundColor: '#0a0e17',
       color: 'white',
       padding: 0,
-      margin: 0
+      margin: 0,
+      overflow: 'hidden'
     }}>
       {/* Loading Screen */}
       {!modelsLoaded && (
@@ -256,109 +248,15 @@ const AttendancePage: React.FC = () => {
         }}>
           {/* Top Bar - Minimal */}
           <div style={{ 
-            padding: '12px 20px',
-            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+            padding: '12px 16px',
+            backgroundColor: 'rgba(0, 0, 0, 0.9)',
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
             zIndex: 10,
             borderBottom: '1px solid rgba(255, 255, 255, 0.1)'
           }}>
-            {/* Left - Back Button */}
-            <Button
-              type="text"
-              icon={<Home size={18} />}
-              onClick={() => window.location.href = '/'}
-              style={{ 
-                color: 'white',
-                padding: '4px 8px',
-                minWidth: 'auto'
-              }}
-            />
-
-            {/* Center - Time and Attendance Count */}
-            <Space size="large" style={{ alignItems: 'center' }}>
-              {/* Time Display */}
-              <div style={{ textAlign: 'center' }}>
-                <Text style={{ 
-                  color: 'rgba(255, 255, 255, 0.7)', 
-                  fontSize: 11,
-                  fontWeight: '500',
-                  display: 'block'
-                }}>
-                  TIME
-                </Text>
-                <Text style={{ 
-                  color: 'white', 
-                  fontSize: 16,
-                  fontWeight: 'bold'
-                }}>
-                  {currentTime}
-                </Text>
-              </div>
-
-              {/* Attendance Counter Circle */}
-              <div style={{ 
-                width: 70,
-                height: 70,
-                borderRadius: '50%',
-                backgroundColor: 'rgba(82, 196, 26, 0.2)',
-                border: '2px solid #52c41a',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                textAlign: 'center'
-              }}>
-                <Text style={{ 
-                  color: '#52c41a', 
-                  fontSize: 22,
-                  fontWeight: 'bold',
-                  lineHeight: '24px'
-                }}>
-                  {presentToday}
-                </Text>
-                <Text style={{ 
-                  color: 'rgba(255, 255, 255, 0.6)', 
-                  fontSize: 10,
-                  marginTop: 2
-                }}>
-                  PRESENT
-                </Text>
-              </div>
-
-              {/* Scan Counter Circle */}
-              <div style={{ 
-                width: 60,
-                height: 60,
-                borderRadius: '50%',
-                backgroundColor: 'rgba(24, 144, 255, 0.2)',
-                border: '2px solid #1890ff',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                textAlign: 'center'
-              }}>
-                <Text style={{ 
-                  color: '#1890ff', 
-                  fontSize: 18,
-                  fontWeight: 'bold',
-                  lineHeight: '20px'
-                }}>
-                  {scanCount}
-                </Text>
-                <Text style={{ 
-                  color: 'rgba(255, 255, 255, 0.6)', 
-                  fontSize: 9,
-                  marginTop: 2
-                }}>
-                  SCANS
-                </Text>
-              </div>
-            </Space>
-
-            {/* Right - Status Indicator */}
+            {/* Left - Status Indicator */}
             <Badge 
               status={autoScanEnabled ? "success" : "warning"}
               text={
@@ -367,139 +265,221 @@ const AttendancePage: React.FC = () => {
                   fontSize: 12,
                   fontWeight: 'bold'
                 }}>
-                  {autoScanEnabled ? "ACTIVE" : "PAUSED"}
+                  {autoScanEnabled ? "SCANNING" : "READY"}
                 </Text>
               } 
             />
+
+            {/* Center - Attendance Counter Square */}
+            <div style={{ 
+              width: 65,
+              height: 65,
+              borderRadius: '8px',
+              backgroundColor: 'rgba(82, 196, 26, 0.1)',
+              border: '2px solid #52c41a',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              textAlign: 'center'
+            }}>
+              <Text style={{ 
+                color: '#52c41a', 
+                fontSize: 24,
+                fontWeight: 'bold',
+                lineHeight: '26px'
+              }}>
+                {presentToday}
+              </Text>
+              <Text style={{ 
+                color: 'rgba(255, 255, 255, 0.6)', 
+                fontSize: 10,
+                marginTop: 2
+              }}>
+                PRESENT
+              </Text>
+            </div>
+
+            {/* Right - Control Buttons */}
+            <Space>
+              {autoScanEnabled ? (
+                <Button
+                  type="primary"
+                  danger
+                  onClick={toggleAutoScan}
+                  icon={<StopCircle size={16} />}
+                  size="small"
+                  style={{ 
+                    padding: '6px 16px',
+                    fontSize: 12,
+                    height: 'auto'
+                  }}
+                >
+                  STOP
+                </Button>
+              ) : (
+                <Button
+                  type="primary"
+                  onClick={toggleAutoScan}
+                  icon={<Play size={16} />}
+                  size="small"
+                  style={{ 
+                    padding: '6px 16px',
+                    fontSize: 12,
+                    height: 'auto'
+                  }}
+                >
+                  START
+                </Button>
+              )}
+            </Space>
           </div>
 
-          {/* Main Camera Area */}
+          {/* Main Camera Area - No scrolling */}
           <div style={{ 
             flex: 1,
             position: 'relative',
             backgroundColor: '#000',
-            overflow: 'hidden'
+            overflow: 'hidden',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
           }}>
-            <FaceCamera
-              mode="attendance"
-              onAttendanceComplete={handleAttendanceComplete}
-              autoCapture={autoScanEnabled}
-              captureInterval={2000}
-              loading={loading}
-            />
-            
-            {/* Face Guide Circle */}
-            <div style={{
-              position: 'absolute',
-              top: '50%',
-              left: '50%',
-              transform: 'translate(-50%, -50%)',
-              width: 280,
-              height: 280,
-              borderRadius: '50%',
-              border: '2px dashed rgba(255, 255, 255, 0.3)',
-              pointerEvents: 'none',
-              boxShadow: '0 0 0 1000px rgba(0, 0, 0, 0.3)'
+            <div style={{ 
+              width: '100%',
+              height: '100%',
+              position: 'relative'
             }}>
-              {loading && (
+              <FaceCamera
+                mode="attendance"
+                onAttendanceComplete={handleAttendanceComplete}
+                autoCapture={autoScanEnabled}
+                captureInterval={2000}
+                loading={loading}
+              />
+              
+              {/* Face Guide Square */}
+              <div style={{
+                position: 'absolute',
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -50%)',
+                width: 300,
+                height: 300,
+                borderRadius: '12px',
+                border: '2px dashed rgba(255, 255, 255, 0.4)',
+                pointerEvents: 'none',
+                boxShadow: '0 0 0 1000px rgba(0, 0, 0, 0.4)'
+              }}>
+                {loading && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '50%',
+                    left: '50%',
+                    transform: 'translate(-50%, -50%)',
+                    textAlign: 'center',
+                    width: '100%'
+                  }}>
+                    <Spin size="large" style={{ color: '#1890ff' }} />
+                    <Text style={{ 
+                      color: 'white', 
+                      marginTop: 16,
+                      fontSize: 16,
+                      fontWeight: 'bold'
+                    }}>
+                      SCANNING...
+                    </Text>
+                  </div>
+                )}
+                
+                {/* Dotted corners */}
                 <div style={{
                   position: 'absolute',
-                  top: '50%',
-                  left: '50%',
-                  transform: 'translate(-50%, -50%)',
-                  textAlign: 'center'
-                }}>
-                  <Spin size="large" style={{ color: '#1890ff' }} />
-                  <Text style={{ 
-                    color: 'white', 
-                    marginTop: 16,
-                    fontSize: 14,
-                    fontWeight: 'bold'
-                  }}>
-                    SCANNING...
-                  </Text>
-                </div>
-              )}
-            </div>
+                  top: -2,
+                  left: -2,
+                  width: 20,
+                  height: 20,
+                  borderTop: '3px dotted rgba(255, 255, 255, 0.6)',
+                  borderLeft: '3px dotted rgba(255, 255, 255, 0.6)'
+                }} />
+                <div style={{
+                  position: 'absolute',
+                  top: -2,
+                  right: -2,
+                  width: 20,
+                  height: 20,
+                  borderTop: '3px dotted rgba(255, 255, 255, 0.6)',
+                  borderRight: '3px dotted rgba(255, 255, 255, 0.6)'
+                }} />
+                <div style={{
+                  position: 'absolute',
+                  bottom: -2,
+                  left: -2,
+                  width: 20,
+                  height: 20,
+                  borderBottom: '3px dotted rgba(255, 255, 255, 0.6)',
+                  borderLeft: '3px dotted rgba(255, 255, 255, 0.6)'
+                }} />
+                <div style={{
+                  position: 'absolute',
+                  bottom: -2,
+                  right: -2,
+                  width: 20,
+                  height: 20,
+                  borderBottom: '3px dotted rgba(255, 255, 255, 0.6)',
+                  borderRight: '3px dotted rgba(255, 255, 255, 0.6)'
+                }} />
+              </div>
 
-            {/* Bottom Status Bar */}
-            <div style={{
-              position: 'absolute',
-              bottom: 0,
-              left: 0,
-              right: 0,
-              backgroundColor: 'rgba(0, 0, 0, 0.7)',
-              padding: '12px 20px',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center'
-            }}>
-              {/* Left - Camera Status */}
-              <Space>
-                <Tag color={autoScanEnabled ? "green" : "red"} style={{ margin: 0, fontSize: 11 }}>
-                  CAM: {autoScanEnabled ? "ON" : "OFF"}
-                </Tag>
-                <Tag color={autoScanEnabled ? "green" : "red"} style={{ margin: 0, fontSize: 11 }}>
-                  AUTO: {autoScanEnabled ? "ON" : "OFF"}
-                </Tag>
-              </Space>
-
-              {/* Center - Instruction */}
-              <Text style={{ 
-                color: 'rgba(255, 255, 255, 0.7)', 
-                fontSize: 13,
-                fontWeight: '500'
+              {/* Bottom Status Bar */}
+              <div style={{
+                position: 'absolute',
+                bottom: 0,
+                left: 0,
+                right: 0,
+                backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                padding: '10px 16px',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                borderTop: '1px solid rgba(255, 255, 255, 0.1)'
               }}>
-                {autoScanEnabled ? "Position face in circle" : "Auto-scan paused"}
-              </Text>
+                {/* Left - Status */}
+                <Space>
+                  <Tag color={autoScanEnabled ? "green" : "default"} style={{ margin: 0, fontSize: 11 }}>
+                    {autoScanEnabled ? "AUTO ON" : "AUTO OFF"}
+                  </Tag>
+                  <Tag color={modelsLoaded ? "success" : "warning"} style={{ margin: 0, fontSize: 11 }}>
+                    {modelsLoaded ? "READY" : "LOADING"}
+                  </Tag>
+                </Space>
 
-              {/* Right - Control Buttons */}
-              <Space>
-                {autoScanEnabled ? (
-                  <Button
-                    type="primary"
-                    danger
-                    onClick={toggleAutoScan}
-                    icon={<StopCircle size={14} />}
-                    size="small"
-                    style={{ 
-                      padding: '4px 12px',
-                      fontSize: 12,
-                      height: 'auto'
-                    }}
-                  >
-                    STOP
-                  </Button>
-                ) : (
-                  <Button
-                    type="primary"
-                    onClick={toggleAutoScan}
-                    icon={<Play size={14} />}
-                    size="small"
-                    style={{ 
-                      padding: '4px 12px',
-                      fontSize: 12,
-                      height: 'auto'
-                    }}
-                  >
-                    START
-                  </Button>
-                )}
-              </Space>
+                {/* Center - Instruction */}
+                <Text style={{ 
+                  color: 'rgba(255, 255, 255, 0.7)', 
+                  fontSize: 12,
+                  fontWeight: '500'
+                }}>
+                  {autoScanEnabled ? "Face detection active" : "Press START to begin"}
+                </Text>
+
+                {/* Right - Empty for balance */}
+                <div style={{ width: 60 }}></div>
+              </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Processing/Results View */}
+      {/* Processing/Results View - No scrolling */}
       {!showCamera && modelsLoaded && (
         <div style={{ 
           height: '100vh',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          padding: 20,
-          backgroundColor: '#0a0e17'
+          backgroundColor: '#0a0e17',
+          overflow: 'hidden'
         }}>
           {processing ? (
             <div style={{ textAlign: 'center' }}>
@@ -584,7 +564,16 @@ const AttendancePage: React.FC = () => {
               <Text style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: 14, marginBottom: 24 }}>
                 Face not recognized
               </Text>
-              
+              <Button
+                type="primary"
+                onClick={resetToCamera}
+                style={{ 
+                  padding: '8px 24px',
+                  fontSize: 14
+                }}
+              >
+                Try Again
+              </Button>
             </div>
           )}
         </div>
