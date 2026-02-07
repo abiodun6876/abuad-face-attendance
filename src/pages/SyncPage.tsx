@@ -1,11 +1,11 @@
 // src/pages/SyncPage.tsx
 import React, { useState, useEffect } from 'react';
 import { Card, Table, Button, Space, Typography, Alert, Tag, Progress, message } from 'antd';
-import { 
-  RefreshCw, 
-  Database, 
-  CheckCircle, 
-  XCircle, 
+import {
+  RefreshCw,
+  Database,
+  CheckCircle,
+  XCircle,
   Clock,
   Trash2,
   Wifi,
@@ -26,11 +26,11 @@ const SyncPage: React.FC = () => {
   useEffect(() => {
     loadData();
     setLastSync(LocalSyncService.getLastSyncTime());
-    
+
     // Listen for online/offline events
     window.addEventListener('online', handleOnlineStatus);
     window.addEventListener('offline', handleOnlineStatus);
-    
+
     return () => {
       window.removeEventListener('online', handleOnlineStatus);
       window.removeEventListener('offline', handleOnlineStatus);
@@ -86,7 +86,7 @@ const SyncPage: React.FC = () => {
       render: (op: string) => (
         <Tag color={
           op === 'insert' ? 'green' :
-          op === 'update' ? 'orange' : 'red'
+            op === 'update' ? 'orange' : 'red'
         }>
           {op.toUpperCase()}
         </Tag>
@@ -133,28 +133,28 @@ const SyncPage: React.FC = () => {
   const syncedItems = syncQueue.filter(item => item.processed);
 
   return (
-    <div>
-      <Title level={2}>Data Sync Management</Title>
-      <Text type="secondary">
-        Manage offline data and sync with AFE Babalola University servers
-      </Text>
+    <div style={{ padding: '40px 24px', maxWidth: 1200, margin: '0 auto', background: 'var(--dark-bg)' }}>
+      <div style={{ marginBottom: 32 }}>
+        <Title level={2} style={{ margin: 0, fontWeight: 800 }}>Sync Management</Title>
+        <Text type="secondary" style={{ fontSize: '16px' }}>Manage offline data and server synchronization</Text>
+      </div>
 
       {/* Network Status */}
-      <Card style={{ marginTop: 24 }}>
+      <Card bordered={false} className="stat-card" style={{ marginBottom: 24 }}>
         <Space direction="vertical" style={{ width: '100%' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Title level={4}>Network Status</Title>
+            <Title level={4} style={{ margin: 0 }}>Connection Status</Title>
             {isOnline ? (
-              <Tag icon={<Wifi size={14} />} color="success">
-                Online
+              <Tag icon={<Wifi size={14} />} color="black" style={{ borderRadius: 4, fontWeight: 600 }}>
+                CONNECTED
               </Tag>
             ) : (
               <Tag icon={<WifiOff size={14} />} color="error">
-                Offline
+                OFFLINE
               </Tag>
             )}
           </div>
-          
+
           {!isOnline && (
             <Alert
               message="You are currently offline"
@@ -163,7 +163,7 @@ const SyncPage: React.FC = () => {
               showIcon
             />
           )}
-          
+
           {lastSync && (
             <div>
               <Text>Last successful sync: </Text>
@@ -174,28 +174,30 @@ const SyncPage: React.FC = () => {
       </Card>
 
       {/* Sync Controls */}
-      <Card style={{ marginTop: 24 }}>
+      <Card bordered={false} className="stat-card" style={{ marginBottom: 24 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <Title level={4}>Sync Controls</Title>
+            <Title level={4} style={{ margin: 0 }}>Sync Queue</Title>
             <Text type="secondary">
-              {pendingItems.length} items pending sync
+              {pendingItems.length} records awaiting upload
             </Text>
           </div>
           <Space>
             <Button
               type="primary"
-              icon={<RefreshCw />}
+              icon={<RefreshCw size={16} />}
               onClick={handleSync}
               loading={syncing}
               disabled={pendingItems.length === 0 || !isOnline}
+              style={{ background: '#000', borderColor: '#000', borderRadius: 6 }}
             >
               Sync Now
             </Button>
             <Button
-              icon={<Trash2 />}
+              icon={<Trash2 size={16} />}
               onClick={handleClearProcessed}
               disabled={syncedItems.length === 0}
+              style={{ borderRadius: 6 }}
             >
               Clear Processed
             </Button>
@@ -204,7 +206,7 @@ const SyncPage: React.FC = () => {
 
         {pendingItems.length > 0 && (
           <div style={{ marginTop: 16 }}>
-            <Progress 
+            <Progress
               percent={Math.round((syncedItems.length / syncQueue.length) * 100)}
               status="active"
               format={() => `${syncedItems.length}/${syncQueue.length} items synced`}
@@ -244,7 +246,7 @@ const SyncPage: React.FC = () => {
           showIcon
           icon={<Database />}
         />
-        
+
         {Object.keys(offlineData).length > 0 && (
           <Table
             style={{ marginTop: 16 }}

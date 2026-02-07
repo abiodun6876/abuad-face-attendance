@@ -106,20 +106,20 @@ const CourseRegistrationPage: React.FC = () => {
     try {
       setSearching(true);
       console.log('Searching for student ID:', id);
-      
+
       // Clean the input
       const cleanId = id.trim().toUpperCase();
       console.log('Cleaned ID:', cleanId);
-      
+
       // First try exact match on student_id
       console.log('Trying exact match on student_id...');
       let { data, error } = await supabase
         .from('students')
         .select('*')
         .eq('student_id', cleanId);
-      
+
       console.log('Exact match result:', { data, error });
-      
+
       // If no exact match, try partial match
       if (!data || data.length === 0) {
         console.log('Trying partial match...');
@@ -127,12 +127,12 @@ const CourseRegistrationPage: React.FC = () => {
           .from('students')
           .select('*')
           .ilike('student_id', `%${cleanId}%`);
-        
+
         console.log('Partial match result:', { data2, error2 });
         data = data2;
         error = error2;
       }
-      
+
       // If still no match, try searching by name
       if (!data || data.length === 0) {
         console.log('Trying name search...');
@@ -140,38 +140,38 @@ const CourseRegistrationPage: React.FC = () => {
           .from('students')
           .select('*')
           .ilike('name', `%${cleanId}%`);
-        
+
         console.log('Name search result:', { data3, error3 });
         data = data3;
         error = error3;
       }
-      
+
       if (error) {
         console.error('Database error details:', error);
         message.error(`Database error: ${error.message}`);
         return null;
       }
-      
+
       if (!data || data.length === 0) {
         console.log('No students found with any matching criteria');
         message.error(`No student found with ID: "${id}"`);
         return null;
       }
-      
+
       if (data.length > 1) {
         console.warn('Multiple students found:', data);
         const matches = data.map(d => `${d.student_id || d.id} - ${d.name}`).join(', ');
         message.warning(`Multiple students found. Using: ${data[0].name}`);
       }
-      
+
       const student = data[0];
       console.log('Successfully found student:', student);
       console.log('Student ID:', student.id);
       console.log('Student student_id:', student.student_id);
       console.log('Student name:', student.name);
-      
+
       return student;
-      
+
     } catch (error: any) {
       console.error('Error finding student:', error);
       message.error(`Search error: ${error.message}`);
@@ -185,7 +185,7 @@ const CourseRegistrationPage: React.FC = () => {
     try {
       setLoading(true);
       console.log('Fetching enrollments for student ID:', studentId);
-      
+
       const { data, error } = await supabase
         .from('enrollments')
         .select(`
@@ -209,24 +209,24 @@ const CourseRegistrationPage: React.FC = () => {
         message.error('Failed to load enrolled courses');
         return;
       }
-      
+
       console.log('Enrollments loaded:', data);
       setEnrolledCourses(data || []);
-      
+
       // Filter available courses (not enrolled and matching student level)
       const enrolledCourseIds = (data || []).map((e: any) => e.course_id);
       console.log('Enrolled course IDs:', enrolledCourseIds);
-      
-      const available = courses.filter(c => 
-        !enrolledCourseIds.includes(c.id) && 
+
+      const available = courses.filter(c =>
+        !enrolledCourseIds.includes(c.id) &&
         c.level === selectedStudent?.level
       );
-      
+
       console.log('Available courses:', available);
       setAvailableCourses(available);
       setSelectedCourses([]);
       setIsSelectAll(false);
-      
+
     } catch (error) {
       console.error('Error fetching enrollments:', error);
     } finally {
@@ -241,7 +241,7 @@ const CourseRegistrationPage: React.FC = () => {
     }
 
     console.log('Starting search for:', studentId);
-    
+
     const student = await findStudentById(studentId);
     if (student) {
       console.log('Setting selected student:', student);
@@ -309,10 +309,10 @@ const CourseRegistrationPage: React.FC = () => {
 
       console.log('Enrollment successful:', data);
       message.success(`Successfully enrolled in ${selectedCourses.length} course(s)`);
-      
+
       // Refresh data
       await fetchStudentEnrollments(selectedStudent.student_id || selectedStudent.id);
-      
+
     } catch (error: any) {
       console.error('Enrollment error:', error);
       message.error(`Failed to enroll: ${error.message || 'Unknown error'}`);
@@ -322,10 +322,10 @@ const CourseRegistrationPage: React.FC = () => {
   const unenrollCourse = async (enrollmentId: string) => {
     try {
       console.log('Unenrolling enrollment:', enrollmentId);
-      
+
       const { error } = await supabase
         .from('enrollments')
-        .update({ 
+        .update({
           status: 'inactive',
           updated_at: new Date().toISOString()
         })
@@ -338,7 +338,7 @@ const CourseRegistrationPage: React.FC = () => {
 
       message.success('Course unenrolled successfully');
       await fetchStudentEnrollments(selectedStudent?.student_id || selectedStudent?.id || '');
-      
+
     } catch (error: any) {
       console.error('Unenrollment error:', error);
       message.error(`Failed to unenroll: ${error.message || 'Unknown error'}`);
@@ -396,31 +396,34 @@ const CourseRegistrationPage: React.FC = () => {
   ];
 
   return (
-    <div style={{ padding: '20px' }}>
-      <Title level={2}>Student Course Enrollment</Title>
-      <Text type="secondary">
-        Enroll students in courses
-      </Text>
+    <div style={{ padding: '40px 24px', maxWidth: 1200, margin: '0 auto', background: 'var(--dark-bg)' }}>
+      <div style={{ marginBottom: 32 }}>
+        <Title level={2} style={{ margin: 0, fontWeight: 800 }}>Course Enrollment</Title>
+        <Text type="secondary" style={{ fontSize: '16px' }}>Manage student course registrations and academic profiles</Text>
+      </div>
 
-      <Card style={{ marginTop: 20 }}>
+      <Card bordered={false} className="stat-card" style={{ borderRadius: 12, boxShadow: '0 8px 30px rgba(0,0,0,0.04)' }}>
         <Row gutter={[16, 16]} style={{ marginBottom: 20 }}>
           <Col xs={24} md={12}>
             <Space.Compact style={{ width: '100%' }}>
               <Input
-                placeholder="Enter Student ID (e.g., ABU/2024/001 or ABU24007)"
+                placeholder="Enter Student ID (e.g., ABU/2024/001)"
                 value={studentId}
                 onChange={(e) => setStudentId(e.target.value)}
                 onPressEnter={handleStudentSearch}
+                size="large"
                 allowClear
                 disabled={searching}
+                prefix={<Search size={16} style={{ color: '#bfbfbf' }} />}
               />
-              <Button 
-                type="primary" 
+              <Button
+                type="primary"
                 onClick={handleStudentSearch}
                 loading={searching}
-                icon={<Search size={16} />}
+                size="large"
+                style={{ background: '#000', borderColor: '#000' }}
               >
-                {searching ? 'Searching...' : 'Search'}
+                Search
               </Button>
             </Space.Compact>
             <Text type="secondary" style={{ fontSize: '12px', marginTop: 4, display: 'block' }}>
@@ -485,7 +488,7 @@ const CourseRegistrationPage: React.FC = () => {
                   </Button>
                 </Space>
               </div>
-              
+
               {loading ? (
                 <div style={{ textAlign: 'center', padding: '40px' }}>
                   <Spin size="large" />

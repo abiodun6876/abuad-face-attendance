@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Spin, Alert, Typography, Space, ConfigProvider, theme, Card, Row, Col, Button } from 'antd';
-import { 
+import {
   UserPlus,
   Camera,
   Book,
@@ -26,38 +26,40 @@ interface ConnectionStatus {
 // Wrapper component to add back button to pages
 const PageWrapper = ({ children, showBackButton = true }: { children: React.ReactNode, showBackButton?: boolean }) => {
   return (
-    <div style={{ 
+    <div style={{
       height: '100vh',
       display: 'flex',
       flexDirection: 'column',
-      backgroundColor: '#f0f2f5'
+      backgroundColor: 'var(--darker-bg)'
     }}>
       {/* Header with back button */}
       {showBackButton && (
-        <div style={{ 
-          padding: '12px 16px',
+        <div style={{
+          padding: '12px 24px',
           backgroundColor: '#fff',
-          borderBottom: '1px solid #f0f0f0',
+          borderBottom: '1px solid var(--border-color)',
           display: 'flex',
           alignItems: 'center',
-          gap: 12
+          justifyContent: 'space-between'
         }}>
           <Button
             type="text"
             icon={<ArrowLeft size={18} />}
             onClick={() => window.location.href = '/'}
-            style={{ 
+            style={{
               padding: '4px 8px',
               display: 'flex',
               alignItems: 'center',
-              gap: 4
+              gap: 8,
+              height: 'auto'
             }}
           >
-            <Text style={{ fontSize: 14 }}>Back</Text>
+            <Text style={{ fontSize: 14, fontWeight: 500 }}>Back to Home</Text>
           </Button>
+          <div style={{ fontWeight: 700, fontSize: '14px', letterSpacing: '0.5px' }}>ABUAD_BIO_SYS</div>
         </div>
       )}
-      
+
       {/* Page content */}
       <div style={{ flex: 1, overflow: 'auto' }}>
         {children}
@@ -70,27 +72,27 @@ const HomeCards = () => {
   const cards = [
     {
       key: 'enroll',
-      title: 'Student Enrollment',
-      description: 'Enroll new students with face recognition',
-      icon: <UserPlus size={32} />,
+      title: 'Biometric Enrollment',
+      description: 'Register new students into the system with face recognition',
+      icon: <UserPlus size={28} />,
       path: '/enroll',
-      color: '#1890ff',
+      color: '#000',
     },
     {
       key: 'attendance',
-      title: 'Take Attendance',
-      description: 'Mark attendance using face recognition',
-      icon: <Camera size={32} />,
+      title: 'Face Attendance',
+      description: 'Mark daily attendance using high-speed face authentication',
+      icon: <Camera size={28} />,
       path: '/attendance',
-      color: '#52c41a',
+      color: '#000',
     },
     {
       key: 'attendance-management',
-      title: 'Manage Attendance',
-      description: 'View, search and filter all records',
-      icon: <Book size={32} />,
+      title: 'Records Management',
+      description: 'Access detailed attendance logs, analytics and reports',
+      icon: <Book size={28} />,
       path: '/attendance-management',
-      color: '#722ed1',
+      color: '#000',
     },
   ];
 
@@ -99,79 +101,86 @@ const HomeCards = () => {
   };
 
   return (
-    <div style={{ 
+    <div style={{
       height: '100vh',
       display: 'flex',
       flexDirection: 'column',
       justifyContent: 'center',
       alignItems: 'center',
-      padding: 20,
-      backgroundColor: '#f0f2f5'
+      padding: '40px 20px',
+      backgroundColor: '#fff'
     }}>
-      <div style={{ 
-        textAlign: 'center', 
-        marginBottom: 40 
+      <div style={{
+        textAlign: 'center',
+        marginBottom: 64
       }}>
-        <Title level={2} style={{ marginBottom: 8 }}>
-          Face Attendance System
+        <Title level={1} style={{ marginBottom: 16, fontWeight: 900, letterSpacing: '-1px' }}>
+          ABUAD BIO_STATS
         </Title>
-        <Text type="secondary">
-          Select an option to begin
+        <Text type="secondary" style={{ fontSize: '18px', display: 'block', maxWidth: '500px' }}>
+          Intelligent Face Recognition Attendance System
         </Text>
       </div>
 
-      <Row gutter={[24, 24]} justify="center" style={{ maxWidth: 800 }}>
+      <Row gutter={[32, 32]} justify="center" style={{ maxWidth: 1100, width: '100%' }}>
         {cards.map((card) => (
-          <Col xs={24} sm={12} md={8} key={card.key}>
+          <Col xs={24} md={8} key={card.key}>
             <Card
               hoverable
               onClick={() => navigate(card.path)}
+              variant="outlined"
               style={{
                 height: '100%',
-                border: `1px solid ${card.color}20`,
-                borderRadius: 12,
-                transition: 'all 0.3s',
+                borderRadius: 16,
+                transition: 'all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1)',
+                border: '1px solid #eee',
+                padding: '20px 10px'
               }}
               bodyStyle={{
                 padding: '24px',
-                textAlign: 'center',
+                textAlign: 'left',
               }}
+              className="stat-card"
             >
-              <div style={{ 
-                display: 'flex', 
-                flexDirection: 'column', 
+              <div style={{
+                width: 56,
+                height: 56,
+                borderRadius: 12,
+                backgroundColor: '#000',
+                display: 'flex',
                 alignItems: 'center',
-                gap: 16 
+                justifyContent: 'center',
+                marginBottom: 24,
+                boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
               }}>
-                <div style={{
-                  width: 80,
-                  height: 80,
-                  borderRadius: '50%',
-                  backgroundColor: `${card.color}15`,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}>
-                  {React.cloneElement(card.icon, { color: card.color })}
-                </div>
-                <Title level={4} style={{ margin: 0, color: card.color }}>
-                  {card.title}
-                </Title>
-                <Text type="secondary" style={{ fontSize: '14px' }}>
-                  {card.description}
-                </Text>
+                {React.cloneElement(card.icon, { color: '#fff' })}
+              </div>
+              <Title level={3} style={{ margin: '0 0 12px 0', fontWeight: 700 }}>
+                {card.title}
+              </Title>
+              <Text type="secondary" style={{ fontSize: '15px', lineHeight: '1.6', display: 'block' }}>
+                {card.description}
+              </Text>
+              <div style={{ marginTop: 24 }}>
+                <Button
+                  type="text"
+                  style={{ padding: 0, fontWeight: 600, fontSize: '13px' }}
+                >
+                  START_MODULE →
+                </Button>
               </div>
             </Card>
           </Col>
         ))}
       </Row>
 
-      <div style={{ 
-        marginTop: 40,
-        textAlign: 'center' 
+      <div style={{
+        position: 'absolute',
+        bottom: 40,
+        textAlign: 'center'
       }}>
-        <Text type="secondary" style={{ fontSize: '12px' }}>
-          AFE Babalola University • Face Authentication System
+        <Text style={{ fontSize: '12px', color: '#bfbfbf', fontWeight: 600, letterSpacing: '1px' }}>
+          AFE BABALOLA UNIVERSITY • BIOMETRIC UNIT
         </Text>
       </div>
     </div>
@@ -192,7 +201,7 @@ function App() {
           .from('faculties')
           .select('*')
           .limit(1);
-        
+
         if (error) {
           console.error('Connection test failed:', error);
           setConnectionStatus({
@@ -218,18 +227,18 @@ function App() {
         setLoading(false);
       }
     }
-    
+
     testConnection();
   }, []);
 
   if (connectionStatus.status === 'error') {
     return (
       <ConfigProvider theme={{ algorithm: theme.defaultAlgorithm }}>
-        <div style={{ 
-          display: 'flex', 
+        <div style={{
+          display: 'flex',
           flexDirection: 'column',
-          justifyContent: 'center', 
-          alignItems: 'center', 
+          justifyContent: 'center',
+          alignItems: 'center',
           height: '100vh',
           padding: 20,
           maxWidth: 500,
@@ -241,7 +250,7 @@ function App() {
               <div>
                 <p>Failed to connect to database.</p>
                 <div style={{ marginTop: 20 }}>
-                  <button 
+                  <button
                     onClick={() => window.location.reload()}
                     style={{
                       padding: '8px 16px',
@@ -267,11 +276,11 @@ function App() {
 
   if (loading) {
     return (
-      <div style={{ 
-        display: 'flex', 
+      <div style={{
+        display: 'flex',
         flexDirection: 'column',
-        justifyContent: 'center', 
-        alignItems: 'center', 
+        justifyContent: 'center',
+        alignItems: 'center',
         height: '100vh',
       }}>
         <Spin size="large" />
@@ -287,9 +296,19 @@ function App() {
       theme={{
         algorithm: theme.defaultAlgorithm,
         token: {
-          colorPrimary: '#1890ff',
-          borderRadius: 8,
+          colorPrimary: '#000000',
+          borderRadius: 4,
+          fontFamily: 'Outfit, sans-serif',
         },
+        components: {
+          Button: {
+            borderRadius: 4,
+            fontWeight: 600,
+          },
+          Card: {
+            borderRadius: 12,
+          }
+        }
       }}
     >
       <Router>

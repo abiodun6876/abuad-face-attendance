@@ -1,19 +1,23 @@
-/* src/App.css - FUTURISTIC BLUE THEME */
+/* src/App.css - CLEAN PROFESSIONAL THEME */
 :root {
-  --primary-color: #00aaff;
-  --secondary-color: #00ffaa;
-  --dark-bg: #0a1a35;
-  --darker-bg: #051024;
-  --light-bg: #0f2447;
-  --text-primary: #ffffff;
-  --text-secondary: #aaccff;
-  --success-color: #00ffaa;
-  --warning-color: #ffaa00;
-  --error-color: #ff3355;
-  --border-color: rgba(0, 150, 255, 0.3);
-  --glow-blue: 0 0 20px rgba(0, 170, 255, 0.4);
-  --glow-green: 0 0 20px rgba(0, 255, 150, 0.4);
-  --glass-bg: rgba(10, 26, 53, 0.8);
+  --primary-color: #000000;
+  --secondary-color: #333333;
+  --dark-bg: #ffffff;
+  --darker-bg: #f8f9fa;
+  --light-bg: #ffffff;
+  --text-primary: #1a1a1a;
+  --text-secondary: #666666;
+  --success-color: #28a745;
+  --warning-color: #ffc107;
+  --error-color: #dc3545;
+  --border-color: #e0e0e0;
+  --glow-blue: 0 4px 12px rgba(0, 0, 0, 0.05);
+  --glow-green: 0 4px 12px rgba(40, 167, 69, 0.1);
+  --glass-bg: rgba(255, 255, 255, 0.9);
+
+  /* Holographic/HUD vars for Camera */
+  --hologram-color: #00f2ff;
+  --hologram-glow: 0 0 15px rgba(0, 242, 255, 0.5);
 }
 
 /* ========== BASE STYLES ========== */
@@ -63,9 +67,9 @@ body {
 }
 
 .ant-menu-item-selected {
-  background: linear-gradient(90deg, 
-    rgba(0, 170, 255, 0.2) 0%, 
-    rgba(0, 170, 255, 0.1) 100%) !important;
+  background: linear-gradient(90deg,
+      rgba(0, 170, 255, 0.2) 0%,
+      rgba(0, 170, 255, 0.1) 100%) !important;
   color: var(--secondary-color) !important;
   border-right: 3px solid var(--secondary-color) !important;
 }
@@ -100,22 +104,21 @@ h4.ant-typography {
 
 /* ========== BUTTONS ========== */
 .ant-btn {
-  border-radius: 8px !important;
-  font-weight: 600 !important;
-  transition: all 0.3s ease !important;
+  border-radius: 6px !important;
+  font-weight: 500 !important;
+  transition: all 0.2s ease !important;
 }
 
 .ant-btn-primary {
-  background: linear-gradient(135deg, var(--primary-color) 0%, #0066cc 100%) !important;
+  background: var(--primary-color) !important;
   border: none !important;
   color: white !important;
-  box-shadow: var(--glow-blue) !important;
+  box-shadow: none !important;
 }
 
 .ant-btn-primary:hover {
-  background: linear-gradient(135deg, #00bbff 0%, #0088ff 100%) !important;
-  transform: translateY(-2px);
-  box-shadow: 0 0 30px rgba(0, 170, 255, 0.6) !important;
+  background: #333333 !important;
+  transform: translateY(-1px);
 }
 
 .ant-btn-default {
@@ -133,11 +136,10 @@ h4.ant-typography {
 
 /* ========== CARDS ========== */
 .ant-card {
-  background: var(--glass-bg) !important;
+  background: #ffffff !important;
   border: 1px solid var(--border-color) !important;
-  border-radius: 12px !important;
-  backdrop-filter: blur(10px);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02), 0 4px 12px rgba(0, 0, 0, 0.03) !important;
 }
 
 .ant-card-head {
@@ -234,25 +236,26 @@ h4.ant-typography {
   color: var(--text-primary) !important;
 }
 
-.ant-table-thead > tr > th {
-  background: rgba(0, 170, 255, 0.1) !important;
-  color: var(--secondary-color) !important;
+.ant-table-thead>tr>th {
+  background: #f8f9fa !important;
+  color: var(--text-primary) !important;
+  border-bottom: 1px solid var(--border-color) !important;
+  font-weight: 600 !important;
+}
+
+.ant-table-tbody>tr>td {
   border-bottom: 1px solid var(--border-color) !important;
 }
 
-.ant-table-tbody > tr > td {
-  border-bottom: 1px solid var(--border-color) !important;
-}
-
-.ant-table-tbody > tr:hover > td {
+.ant-table-tbody>tr:hover>td {
   background: rgba(0, 170, 255, 0.05) !important;
 }
 
-.ant-table-container table > thead > tr:first-child th:first-child {
+.ant-table-container table>thead>tr:first-child th:first-child {
   border-top-left-radius: 8px;
 }
 
-.ant-table-container table > thead > tr:first-child th:last-child {
+.ant-table-container table>thead>tr:first-child th:last-child {
   border-top-right-radius: 8px;
 }
 
@@ -341,15 +344,31 @@ h4.ant-typography {
 
 /* ========== ANIMATIONS ========== */
 @keyframes pulse {
-  0% { box-shadow: var(--glow-blue); }
-  50% { box-shadow: 0 0 30px rgba(0, 170, 255, 0.6); }
-  100% { box-shadow: var(--glow-blue); }
+  0% {
+    box-shadow: var(--glow-blue);
+  }
+
+  50% {
+    box-shadow: 0 0 30px rgba(0, 170, 255, 0.6);
+  }
+
+  100% {
+    box-shadow: var(--glow-blue);
+  }
 }
 
 @keyframes pulse-green {
-  0% { box-shadow: var(--glow-green); }
-  50% { box-shadow: 0 0 30px rgba(0, 255, 150, 0.6); }
-  100% { box-shadow: var(--glow-green); }
+  0% {
+    box-shadow: var(--glow-green);
+  }
+
+  50% {
+    box-shadow: 0 0 30px rgba(0, 255, 150, 0.6);
+  }
+
+  100% {
+    box-shadow: var(--glow-green);
+  }
 }
 
 @keyframes slideUp {
@@ -357,6 +376,7 @@ h4.ant-typography {
     transform: translateY(100%);
     opacity: 0;
   }
+
   to {
     transform: translateY(0);
     opacity: 1;
@@ -368,6 +388,7 @@ h4.ant-typography {
     opacity: 0;
     transform: translateY(10px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -403,13 +424,136 @@ h4.ant-typography {
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(135deg, #00bbff 0%, #00ffcc 100%);
+  background: #555;
+}
+
+.stat-card {
+  transition: all 0.3s ease;
+}
+
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08) !important;
+}
+
+/* ========== HUD / HOLOGRAPHIC STYLES ========== */
+.hud-container {
+  position: relative;
+  overflow: hidden;
+  border-radius: 12px;
+  background: #000;
+  border: 1px solid rgba(0, 242, 255, 0.3);
+}
+
+.hud-corner {
+  position: absolute;
+  width: 30px;
+  height: 30px;
+  border: 3px solid var(--hologram-color);
+  z-index: 10;
+  filter: drop-shadow(0 0 5px var(--hologram-color));
+}
+
+.corner-tl {
+  top: 20px;
+  left: 20px;
+  border-right: none;
+  border-bottom: none;
+}
+
+.corner-tr {
+  top: 20px;
+  right: 20px;
+  border-left: none;
+  border-bottom: none;
+}
+
+.corner-bl {
+  bottom: 20px;
+  left: 20px;
+  border-right: none;
+  border-top: none;
+}
+
+.corner-br {
+  bottom: 20px;
+  right: 20px;
+  border-left: none;
+  border-top: none;
+}
+
+.laser-scanner {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(to right, transparent, var(--hologram-color), transparent);
+  box-shadow: 0 0 15px var(--hologram-color), 0 0 30px rgba(0, 242, 255, 0.5);
+  z-index: 15;
+  animation: scan 3s linear infinite;
+  opacity: 0.8;
+}
+
+@keyframes scan {
+  0% {
+    top: 0%;
+  }
+
+  50% {
+    top: 100%;
+  }
+
+  100% {
+    top: 0%;
+  }
+}
+
+.hud-status {
+  position: absolute;
+  top: 40px;
+  right: 40px;
+  font-family: 'Courier New', Courier, monospace;
+  color: var(--hologram-color);
+  font-size: 12px;
+  text-shadow: 0 0 8px var(--hologram-color);
+  z-index: 10;
+  text-align: right;
+  letter-spacing: 1px;
+}
+
+.hologram-btn {
+  position: relative;
+  background: transparent !important;
+  border: none !important;
+  color: var(--hologram-color) !important;
+  padding: 12px 24px !important;
+  font-family: 'Courier New', Courier, monospace !important;
+  font-weight: bold !important;
+  letter-spacing: 2px !important;
+  transition: all 0.3s ease !important;
+  clip-path: polygon(10% 0, 100% 0, 90% 100%, 0 100%);
+  background: rgba(0, 242, 255, 0.1) !important;
+  border: 1px solid var(--hologram-color) !important;
+}
+
+.hologram-btn:hover {
+  background: rgba(0, 242, 255, 0.3) !important;
+  box-shadow: 0 0 20px rgba(0, 242, 255, 0.6) !important;
+  transform: scale(1.05) !important;
+}
+
+.hud-error {
+  color: #ff3355;
+  text-shadow: 0 0 10px #ff3355;
+  font-family: 'Courier New', Courier, monospace;
 }
 
 /* ========== RESPONSIVE BREAKPOINTS ========== */
 
 /* Extra small devices (phones, 576px and down) */
 @media (max-width: 576px) {
+
   /* Layout adjustments */
   .ant-layout-header {
     padding: 0 12px;
@@ -417,82 +561,82 @@ h4.ant-typography {
     line-height: 56px;
     background: var(--light-bg) !important;
   }
-  
+
   .ant-layout-header h4.ant-typography {
     font-size: 16px !important;
     margin: 0;
   }
-  
+
   /* Hide sidebar on mobile */
   .ant-layout-sider {
     display: none !important;
   }
-  
+
   /* Content padding */
   .ant-layout-content {
     margin: 8px !important;
     padding: 0 !important;
   }
-  
+
   /* Card adjustments */
   .ant-card {
     margin: 8px 0;
     border-radius: 12px !important;
   }
-  
+
   .ant-card-body {
     padding: 16px !important;
   }
-  
+
   /* Typography adjustments */
   h1.ant-typography {
     font-size: 24px !important;
   }
-  
+
   h2.ant-typography {
     font-size: 20px !important;
   }
-  
+
   h3.ant-typography {
     font-size: 18px !important;
   }
-  
+
   h4.ant-typography {
     font-size: 16px !important;
   }
-  
+
   /* Button adjustments */
   .ant-btn {
     font-size: 14px !important;
     height: 44px !important;
     border-radius: 8px !important;
   }
-  
+
   .ant-btn-lg {
     height: 48px !important;
     font-size: 16px !important;
   }
-  
+
   /* Form adjustments */
   .ant-form-item {
     margin-bottom: 16px !important;
   }
-  
+
   .ant-form-item-label {
     padding-bottom: 4px !important;
   }
-  
+
   /* Grid adjustments */
   .ant-row {
     margin-left: -8px !important;
     margin-right: -8px !important;
   }
-  
+
   .ant-col {
     padding-left: 8px !important;
     padding-right: 8px !important;
   }
-  
+
   /* Select dropdown full screen on mobile */
   .mobile-select-popup .ant-select-dropdown {
     position: fixed !important;
@@ -508,7 +652,7 @@ h4.ant-typography {
     max-height: 70vh !important;
     overflow: auto !important;
   }
-  
+
   .mobile-select-popup .ant-select-item {
     padding: 16px 20px !important;
     min-height: 56px !important;
@@ -522,7 +666,7 @@ h4.ant-typography {
     padding: 0 16px;
     background: var(--light-bg) !important;
   }
-  
+
   /* Collapse sidebar on tablets */
   .ant-layout-sider {
     flex: 0 0 80px !important;
@@ -531,17 +675,17 @@ h4.ant-typography {
     width: 80px !important;
     background: var(--light-bg) !important;
   }
-  
+
   .ant-layout-sider .ant-menu-item span,
   .ant-layout-sider .ant-menu-title-content {
     display: none;
   }
-  
+
   .ant-layout-sider .ant-menu-item {
     padding: 0 24px !important;
     text-align: center;
   }
-  
+
   /* Adjust content padding */
   .ant-layout-content {
     margin: 12px !important;
@@ -662,8 +806,8 @@ h4.ant-typography {
 
 .border-gradient {
   border: double 2px transparent;
-  background-image: linear-gradient(var(--dark-bg), var(--dark-bg)), 
-                    linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+  background-image: linear-gradient(var(--dark-bg), var(--dark-bg)),
+    linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
   background-origin: border-box;
   background-clip: padding-box, border-box;
 }
@@ -673,30 +817,31 @@ h4.ant-typography {
   .mobile-hidden {
     display: none !important;
   }
-  
+
   .mobile-only {
     display: block !important;
   }
-  
+
   .mobile-full-width {
     width: 100% !important;
   }
-  
+
   .mobile-text-center {
     text-align: center !important;
   }
-  
+
   /* Prevent text size adjustment */
   html {
     -webkit-text-size-adjust: 100%;
   }
-  
+
   /* Better tap targets */
-  button, a {
+  button,
+  a {
     min-height: 44px;
     min-width: 44px;
   }
-  
+
   /* Prevent pull-to-refresh */
   body {
     overscroll-behavior-y: contain;
@@ -708,17 +853,17 @@ h4.ant-typography {
   .no-print {
     display: none !important;
   }
-  
+
   .ant-layout-sider,
   .ant-layout-header {
     display: none !important;
   }
-  
+
   .ant-layout-content {
     margin: 0 !important;
     padding: 0 !important;
   }
-  
+
   .ant-card {
     box-shadow: none !important;
     border: 1px solid #ddd !important;

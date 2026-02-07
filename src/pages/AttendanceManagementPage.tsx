@@ -76,12 +76,16 @@ const AttendanceManagementPage: React.FC = () => {
   const [levels, setLevels] = useState<string[]>([]);
   const [departments, setDepartments] = useState<string[]>([]);
   const [stats, setStats] = useState({
-    total: 0,
+    totalRecords: 0,
+    totalUsers: 0,
     present: 0,
-    today: 0,
-    faceVerified: 0,
-    manual: 0
+    punctual: 0,
+    late: 0,
+    absent: 0,
+    attendanceRate: 0,
+    today: 0
   });
+
   const [selectedRecord, setSelectedRecord] = useState<AttendanceRecord | null>(null);
   const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [filters, setFilters] = useState({
@@ -98,30 +102,36 @@ const AttendanceManagementPage: React.FC = () => {
   const fetchAttendanceData = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      // Fetch attendance records
+      const { data: attendance, error: attendanceError } = await supabase
         .from('attendance')
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (error) {
-        throw error;
-      }
+      if (attendanceError) throw attendanceError;
 
-      if (data) {
-        setAttendanceData(data);
-        setFilteredData(data);
-        
+      // Fetch total students
+      const { count: studentCount, error: studentError } = await supabase
+        .from('students')
+        .select('*', { count: 'exact', head: true });
+
+      if (studentError) throw studentError;
+
+      if (attendance) {
+        setAttendanceData(attendance);
+        setFilteredData(attendance);
+
         // Extract unique values for filters
-        const uniqueCourses = Array.from(new Set(data.map(record => record.course_code).filter(Boolean)));
-        const uniqueLevels = Array.from(new Set(data.map(record => record.level).filter(Boolean)));
-        const uniqueDepartments = Array.from(new Set(data.map(record => record.department).filter(Boolean)));
-        
+        const uniqueCourses = Array.from(new Set(attendance.map(record => record.course_code).filter(Boolean)));
+        const uniqueLevels = Array.from(new Set(attendance.map(record => record.level).filter(Boolean)));
+        const uniqueDepartments = Array.from(new Set(attendance.map(record => record.department).filter(Boolean)));
+
         setCourses(uniqueCourses as string[]);
         setLevels(uniqueLevels as string[]);
         setDepartments(uniqueDepartments as string[]);
-        
+
         // Calculate statistics
-        calculateStats(data);
+        calculateStats(attendance, studentCount || 0);
       }
     } catch (error: any) {
       console.error('Error fetching attendance:', error);
@@ -132,19 +142,31 @@ const AttendanceManagementPage: React.FC = () => {
   };
 
   // Calculate statistics
-  const calculateStats = (data: AttendanceRecord[]) => {
+  const calculateStats = (data: AttendanceRecord[], studentCount: number) => {
     const today = dayjs().format('YYYY-MM-DD');
-    const present = data.filter(record => record.status === 'present').length;
-    const todayCount = data.filter(record => record.date === today).length;
-    const faceVerified = data.filter(record => record.method === 'face_recognition').length;
-    const manual = data.filter(record => record.method === 'manual').length;
-    
+    const todayRecords = data.filter(record => record.date === today);
+
+    // For a specific session/day, we usually want stats for that day.
+    // If no date filter is applied, these stats are overall.
+    // Let's calculate based on unique students in the current dataset or overall.
+
+    const presentCount = data.filter(record => record.status === 'present').length;
+    const lateCount = data.filter(record => record.status === 'late').length;
+    const absentCount = data.filter(record => record.status === 'absent').length;
+
+    // Total present = present + late
+    const totalPresent = presentCount + lateCount;
+    const rate = studentCount > 0 ? (totalPresent / studentCount) * 100 : 0;
+
     setStats({
-      total: data.length,
-      present,
-      today: todayCount,
-      faceVerified,
-      manual
+      totalRecords: data.length,
+      totalUsers: studentCount,
+      present: totalPresent,
+      punctual: presentCount,
+      late: lateCount,
+      absent: absentCount,
+      attendanceRate: Math.round(rate),
+      today: todayRecords.length
     });
   };
 
@@ -193,13 +215,14 @@ const AttendanceManagementPage: React.FC = () => {
       const [startDate, endDate] = filters.dateRange;
       filtered = filtered.filter(record => {
         const recordDate = dayjs(record.date);
-        return recordDate.isAfter(startDate.subtract(1, 'day')) && 
-               recordDate.isBefore(endDate.add(1, 'day'));
+        return recordDate.isAfter(startDate.subtract(1, 'day')) &&
+          recordDate.isBefore(endDate.add(1, 'day'));
       });
     }
 
     setFilteredData(filtered);
-    calculateStats(filtered);
+    // Note: We don't update studentCount here because it's global
+    calculateStats(filtered, stats.totalUsers);
   };
 
   // Reset filters
@@ -214,7 +237,7 @@ const AttendanceManagementPage: React.FC = () => {
       dateRange: null
     });
     setFilteredData(attendanceData);
-    calculateStats(attendanceData);
+    calculateStats(attendanceData, stats.totalUsers);
   };
 
   // View record details
@@ -226,7 +249,7 @@ const AttendanceManagementPage: React.FC = () => {
   // Export data
   const exportToCSV = () => {
     const headers = ['Matric Number', 'Name', 'Course Code', 'Course Name', 'Date', 'Time', 'Status', 'Method', 'Confidence', 'Faculty', 'Department', 'Program', 'Level', 'Session', 'Semester', 'Venue'];
-    
+
     const csvData = filteredData.map(record => [
       record.matric_number,
       record.name,
@@ -260,7 +283,7 @@ const AttendanceManagementPage: React.FC = () => {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    
+
     message.success('Data exported successfully');
   };
 
@@ -273,11 +296,11 @@ const AttendanceManagementPage: React.FC = () => {
       width: 200,
       render: (text: string, record: AttendanceRecord) => (
         <Space>
-          <Avatar size="small" style={{ backgroundColor: '#1890ff' }}>
+          <Avatar size="small" style={{ backgroundColor: '#000' }}>
             {text?.charAt(0) || 'S'}
           </Avatar>
           <div>
-            <div style={{ fontWeight: 500 }}>{text}</div>
+            <div style={{ fontWeight: 600, color: '#1a1a1a' }}>{text}</div>
             <Text type="secondary" style={{ fontSize: '12px' }}>
               {record.matric_number}
             </Text>
@@ -292,7 +315,7 @@ const AttendanceManagementPage: React.FC = () => {
       width: 150,
       render: (code: string, record: AttendanceRecord) => (
         <div>
-          <Tag color="blue" style={{ marginBottom: 4 }}>
+          <Tag color="default" style={{ marginBottom: 4, fontWeight: 500 }}>
             {code}
           </Tag>
           <div style={{ fontSize: '12px' }}>{record.course_name}</div>
@@ -306,11 +329,11 @@ const AttendanceManagementPage: React.FC = () => {
       render: (record: AttendanceRecord) => (
         <div>
           <div style={{ fontWeight: 500 }}>
-            <CalendarOutlined style={{ marginRight: 4 }} />
+            <CalendarOutlined style={{ marginRight: 4, fontSize: '12px' }} />
             {dayjs(record.date).format('MMM D, YYYY')}
           </div>
           <Text type="secondary" style={{ fontSize: '12px' }}>
-            <ClockCircleOutlined style={{ marginRight: 4 }} />
+            <ClockCircleOutlined style={{ marginRight: 4, fontSize: '11px' }} />
             {record.time}
           </Text>
         </div>
@@ -329,7 +352,7 @@ const AttendanceManagementPage: React.FC = () => {
         };
         const config = statusConfig[status] || statusConfig.present;
         return (
-          <Tag color={config.color} icon={config.icon}>
+          <Tag color={config.color} icon={config.icon} style={{ borderRadius: '4px' }}>
             {config.text}
           </Tag>
         );
@@ -340,42 +363,40 @@ const AttendanceManagementPage: React.FC = () => {
       dataIndex: 'method',
       key: 'method',
       width: 120,
-      render: (method: string, record: AttendanceRecord) => (
-        <Tooltip title={`Confidence: ${record.confidence ? `${(record.confidence * 100).toFixed(1)}%` : 'N/A'}`}>
-          <Badge
-            color={method === 'face_recognition' ? 'green' : 'blue'}
-            text={
-              method === 'face_recognition' ? 'Face ID' :
+      render: (method: string) => (
+        <Badge
+          status={method === 'face_recognition' ? 'success' : 'default'}
+          text={
+            method === 'face_recognition' ? 'Face ID' :
               method === 'manual' ? 'Manual' : 'QR Code'
-            }
-          />
-        </Tooltip>
+          }
+        />
       ),
     },
     {
-  title: 'Level/Dept',
-  key: 'level_dept',
-  width: 150,
-  render: (record: AttendanceRecord) => (
-    <div>
-      <div style={{ fontSize: '12px' }}>
-        <Tag color="purple" style={{ fontSize: '11px', padding: '2px 6px' }}>L{record.level}</Tag>
-        {record.department && (
-          <Text type="secondary" style={{ marginLeft: 4, fontSize: '11px' }}>
-            {record.department}
-          </Text>
-        )}
-      </div>
-    </div>
-  ),
-},
+      title: 'Level/Dept',
+      key: 'level_dept',
+      width: 150,
+      render: (record: AttendanceRecord) => (
+        <div>
+          <div style={{ fontSize: '12px' }}>
+            <Tag style={{ fontSize: '11px', padding: '0 6px' }}>L{record.level}</Tag>
+            {record.department && (
+              <Text type="secondary" style={{ marginLeft: 4, fontSize: '11px' }}>
+                {record.department}
+              </Text>
+            )}
+          </div>
+        </div>
+      ),
+    },
     {
       title: 'Actions',
       key: 'actions',
       width: 80,
       render: (record: AttendanceRecord) => (
         <Button
-          type="link"
+          type="text"
           icon={<EyeOutlined />}
           onClick={() => viewRecordDetails(record)}
           size="small"
@@ -393,62 +414,75 @@ const AttendanceManagementPage: React.FC = () => {
   }, [filters, attendanceData]);
 
   return (
-    <div style={{ padding: '24px', maxWidth: 1400, margin: '0 auto' }}>
-      <Title level={2} style={{ marginBottom: 24 }}>
-        Attendance Management
-      </Title>
-      <Text type="secondary">
-        View, search, and filter attendance records for all courses
-      </Text>
+    <div style={{ padding: '24px', maxWidth: 1400, margin: '0 auto', background: '#fff' }}>
+      <div style={{ marginBottom: 32 }}>
+        <Title level={2} style={{ margin: 0, fontWeight: 700 }}>
+          Attendance Management
+        </Title>
+        <Text type="secondary" style={{ fontSize: '16px' }}>
+          Real-time tracking and reporting for student attendance
+        </Text>
+      </div>
 
       {/* Statistics Cards */}
-      <Row gutter={[16, 16]} style={{ marginTop: 24, marginBottom: 24 }}>
-        <Col xs={24} sm={12} md={4}>
-          <Card size="small">
+      <Row gutter={[16, 16]} style={{ marginBottom: 32 }}>
+        <Col xs={12} sm={8} md={4}>
+          <Card size="small" className="stat-card">
             <Statistic
-              title="Total Records"
-              value={stats.total}
-              prefix={<BookOutlined />}
-              valueStyle={{ color: '#1890ff' }}
+              title="Total Users"
+              value={stats.totalUsers}
+              prefix={<UserOutlined style={{ fontSize: '16px', color: '#8c8c8c' }} />}
+              valueStyle={{ fontWeight: 700, fontSize: '24px' }}
             />
           </Card>
         </Col>
-        <Col xs={24} sm={12} md={4}>
-          <Card size="small">
+        <Col xs={12} sm={8} md={4}>
+          <Card size="small" className="stat-card">
             <Statistic
               title="Present"
               value={stats.present}
-              prefix={<CheckCircleOutlined />}
-              valueStyle={{ color: '#52c41a' }}
+              prefix={<CheckCircleOutlined style={{ fontSize: '16px', color: '#52c41a' }} />}
+              valueStyle={{ fontWeight: 700, fontSize: '24px', color: '#52c41a' }}
             />
           </Card>
         </Col>
-        <Col xs={24} sm={12} md={4}>
-          <Card size="small">
+        <Col xs={12} sm={8} md={4}>
+          <Card size="small" className="stat-card">
             <Statistic
-              title="Today's Records"
-              value={stats.today}
-              prefix={<CalendarOutlined />}
-              valueStyle={{ color: '#722ed1' }}
+              title="Punctual"
+              value={stats.punctual}
+              prefix={<ClockCircleOutlined style={{ fontSize: '16px', color: '#1890ff' }} />}
+              valueStyle={{ fontWeight: 700, fontSize: '24px', color: '#1890ff' }}
             />
           </Card>
         </Col>
-        <Col xs={24} sm={12} md={6}>
-          <Card size="small">
+        <Col xs={12} sm={8} md={4}>
+          <Card size="small" className="stat-card">
             <Statistic
-              title="Face Verified"
-              value={stats.faceVerified}
-              suffix={`/ ${stats.total}`}
-              valueStyle={{ color: '#fa8c16' }}
+              title="Late"
+              value={stats.late}
+              prefix={<ClockCircleOutlined style={{ fontSize: '16px', color: '#faad14' }} />}
+              valueStyle={{ fontWeight: 700, fontSize: '24px', color: '#faad14' }}
             />
           </Card>
         </Col>
-        <Col xs={24} sm={12} md={6}>
-          <Card size="small">
+        <Col xs={12} sm={8} md={4}>
+          <Card size="small" className="stat-card">
             <Statistic
-              title="Last Updated"
-              value={attendanceData[0] ? dayjs(attendanceData[0].created_at).format('MMM D, h:mm A') : 'N/A'}
-              valueStyle={{ fontSize: '14px', color: '#8c8c8c' }}
+              title="Absent"
+              value={stats.absent}
+              prefix={<CloseCircleOutlined style={{ fontSize: '16px', color: '#ff4d4f' }} />}
+              valueStyle={{ fontWeight: 700, fontSize: '24px', color: '#ff4d4f' }}
+            />
+          </Card>
+        </Col>
+        <Col xs={12} sm={8} md={4}>
+          <Card size="small" className="stat-card" style={{ background: '#000' }}>
+            <Statistic
+              title={<span style={{ color: '#fff' }}>Attendance Rate</span>}
+              value={stats.attendanceRate}
+              suffix={<span style={{ color: '#fff', fontSize: '14px' }}>%</span>}
+              valueStyle={{ fontWeight: 700, fontSize: '24px', color: '#fff' }}
             />
           </Card>
         </Col>
@@ -489,7 +523,7 @@ const AttendanceManagementPage: React.FC = () => {
               placeholder="Search students, courses, or matric numbers..."
               prefix={<SearchOutlined />}
               value={filters.search}
-              onChange={(e) => setFilters({...filters, search: e.target.value})}
+              onChange={(e) => setFilters({ ...filters, search: e.target.value })}
               size="middle"
               allowClear
             />
@@ -499,7 +533,7 @@ const AttendanceManagementPage: React.FC = () => {
               placeholder="Course"
               style={{ width: '100%' }}
               value={filters.course || undefined}
-              onChange={(value) => setFilters({...filters, course: value})}
+              onChange={(value) => setFilters({ ...filters, course: value })}
               size="middle"
               allowClear
             >
@@ -515,7 +549,7 @@ const AttendanceManagementPage: React.FC = () => {
               placeholder="Level"
               style={{ width: '100%' }}
               value={filters.level || undefined}
-              onChange={(value) => setFilters({...filters, level: value})}
+              onChange={(value) => setFilters({ ...filters, level: value })}
               size="middle"
               allowClear
             >
@@ -531,7 +565,7 @@ const AttendanceManagementPage: React.FC = () => {
               placeholder="Department"
               style={{ width: '100%' }}
               value={filters.department || undefined}
-              onChange={(value) => setFilters({...filters, department: value})}
+              onChange={(value) => setFilters({ ...filters, department: value })}
               size="middle"
               allowClear
             >
@@ -547,7 +581,7 @@ const AttendanceManagementPage: React.FC = () => {
               placeholder="Status"
               style={{ width: '100%' }}
               value={filters.status || undefined}
-              onChange={(value) => setFilters({...filters, status: value})}
+              onChange={(value) => setFilters({ ...filters, status: value })}
               size="middle"
               allowClear
             >
@@ -561,7 +595,7 @@ const AttendanceManagementPage: React.FC = () => {
               placeholder="Method"
               style={{ width: '100%' }}
               value={filters.method || undefined}
-              onChange={(value) => setFilters({...filters, method: value})}
+              onChange={(value) => setFilters({ ...filters, method: value })}
               size="middle"
               allowClear
             >
@@ -575,7 +609,7 @@ const AttendanceManagementPage: React.FC = () => {
               style={{ width: '100%' }}
               placeholder={['Start Date', 'End Date']}
               value={filters.dateRange}
-              onChange={(dates) => setFilters({...filters, dateRange: dates as [Dayjs, Dayjs]})}
+              onChange={(dates) => setFilters({ ...filters, dateRange: dates as [Dayjs, Dayjs] })}
               size="middle"
               allowClear
             />
@@ -727,8 +761,8 @@ const AttendanceManagementPage: React.FC = () => {
                       style={{
                         width: `${selectedRecord.confidence * 100}%`,
                         height: 8,
-                        backgroundColor: selectedRecord.confidence > 0.8 ? '#52c41a' : 
-                                       selectedRecord.confidence > 0.6 ? '#faad14' : '#ff4d4f',
+                        backgroundColor: selectedRecord.confidence > 0.8 ? '#52c41a' :
+                          selectedRecord.confidence > 0.6 ? '#faad14' : '#ff4d4f',
                         borderRadius: 4
                       }}
                     />

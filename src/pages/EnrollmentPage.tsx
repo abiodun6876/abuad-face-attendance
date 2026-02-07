@@ -1,15 +1,15 @@
 // pages/EnrollmentPage.tsx - Fixed version
 import React, { useState, useEffect } from 'react';
-import { 
-  Form, 
-  Input, 
-  Select, 
-  Button, 
-  Card, 
-  Typography, 
-  message, 
-  Steps, 
-  Row, 
+import {
+  Form,
+  Input,
+  Select,
+  Button,
+  Card,
+  Typography,
+  message,
+  Steps,
+  Row,
   Col,
   Tag,
   Space,
@@ -43,18 +43,18 @@ const EnrollmentPage: React.FC = () => {
       // Validate and get form values
       const values = await form.validateFields();
       console.log('Form validated, values:', values);
-      
+
       // Save form data to state
       setFormData(values);
-      
+
       // Generate matric number if not provided
       if (!values.matric_number) {
         const newMatric = generateMatricNumber(values.program_code);
         form.setFieldValue('matric_number', newMatric);
         values.matric_number = newMatric;
-        setFormData({...values, matric_number: newMatric});
+        setFormData({ ...values, matric_number: newMatric });
       }
-      
+
       setCurrentStep(1);
       message.success('Student info saved. Ready for face capture.');
     } catch (error: any) {
@@ -66,21 +66,21 @@ const EnrollmentPage: React.FC = () => {
   const handleEnrollmentComplete = async (photoData: string) => {
     console.log('Enrollment photo captured, starting enrollment...');
     console.log('Using form data:', formData);
-    
+
     setLoading(true);
-    
+
     try {
       // Validate required fields from saved form data
       if (!formData.name) {
         throw new Error('Student name not found. Please go back and enter student info.');
       }
-      
+
       // Generate matric number if not provided (double-check)
       if (!formData.matric_number) {
         const newMatric = generateMatricNumber(formData.program_code);
         formData.matric_number = newMatric;
       }
-      
+
       const enrollmentData: EnrollmentData = {
         student_id: formData.matric_number,
         name: formData.name,
@@ -91,12 +91,12 @@ const EnrollmentPage: React.FC = () => {
         level: formData.level,
         photoData
       };
-      
+
       console.log('Enrollment data prepared:', enrollmentData);
-      
+
       const result = await enrollStudent(enrollmentData);
       console.log('Enrollment result:', result);
-      
+
       if (result.success) {
         setEnrollmentResult(result);
         setCurrentStep(2);
@@ -167,11 +167,11 @@ const EnrollmentPage: React.FC = () => {
       title: 'Student Info',
       icon: <User size={16} />,
       content: (
-        <Form 
-          form={form} 
-          layout="vertical" 
+        <Form
+          form={form}
+          layout="vertical"
           initialValues={{ gender: 'male', level: 100, program_code: 'CSC' }}
-          // Remove onFinish and use our custom handler
+        // Remove onFinish and use our custom handler
         >
           <Row gutter={16}>
             <Col span={24}>
@@ -180,23 +180,23 @@ const EnrollmentPage: React.FC = () => {
                 name="name"
                 rules={[{ required: true, message: 'Please enter student name' }]}
               >
-                <Input 
-                  size="large" 
-                  placeholder="Enter student full name" 
+                <Input
+                  size="large"
+                  placeholder="Enter student full name"
                 />
               </Form.Item>
             </Col>
-            
+
             <Col span={24}>
               <Form.Item label="Matric Number" name="matric_number">
                 <Input.Group compact style={{ display: 'flex' }}>
-                  <Input 
-                    size="large" 
-                    placeholder="Will be auto-generated" 
-                    readOnly 
+                  <Input
+                    size="large"
+                    placeholder="Will be auto-generated"
+                    readOnly
                     style={{ flex: 1 }}
                   />
-                  <Button 
+                  <Button
                     onClick={() => {
                       const programCode = form.getFieldValue('program_code');
                       const newMatric = generateMatricNumber(programCode);
@@ -209,7 +209,7 @@ const EnrollmentPage: React.FC = () => {
                 </Input.Group>
               </Form.Item>
             </Col>
-            
+
             <Col span={12}>
               <Form.Item label="Gender" name="gender">
                 <Select size="large">
@@ -218,7 +218,7 @@ const EnrollmentPage: React.FC = () => {
                 </Select>
               </Form.Item>
             </Col>
-            
+
             <Col span={12}>
               <Form.Item label="Level" name="level">
                 <Select size="large">
@@ -230,10 +230,10 @@ const EnrollmentPage: React.FC = () => {
                 </Select>
               </Form.Item>
             </Col>
-            
+
             <Col span={24}>
-              <Form.Item 
-                label="Program" 
+              <Form.Item
+                label="Program"
                 name="program_code"
                 rules={[{ required: true, message: 'Please select a program' }]}
               >
@@ -242,7 +242,7 @@ const EnrollmentPage: React.FC = () => {
                   placeholder="Select program"
                   showSearch
                   optionFilterProp="label"
-                  filterOption={(input, option) => 
+                  filterOption={(input, option) =>
                     (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
                   }
                   options={programOptions}
@@ -250,12 +250,13 @@ const EnrollmentPage: React.FC = () => {
               </Form.Item>
             </Col>
           </Row>
-          
+
           <div style={{ textAlign: 'center', marginTop: 32 }}>
-            <Button 
-              type="primary" 
+            <Button
+              type="primary"
               size="large"
-              onClick={goToFaceCapture} // Use custom handler
+              onClick={goToFaceCapture}
+              style={{ height: '48px', padding: '0 40px', borderRadius: '8px', fontWeight: 600, background: '#000', borderColor: '#000' }}
             >
               Continue to Face Capture
             </Button>
@@ -269,37 +270,42 @@ const EnrollmentPage: React.FC = () => {
       content: (
         <div style={{ textAlign: 'center' }}>
           <Title level={4} style={{ marginBottom: 16 }}>Face Enrollment</Title>
-          
+
           {/* Show saved student info */}
           {formData.name && (
-            <div style={{ 
-              backgroundColor: '#f0f9ff', 
-              padding: '12px 24px', 
-              borderRadius: 8,
-              marginBottom: 16,
-              border: '1px solid #91d5ff'
+            <div style={{
+              backgroundColor: '#f8f9fa',
+              padding: '16px 24px',
+              borderRadius: 12,
+              marginBottom: 24,
+              border: '1px solid #eee',
+              textAlign: 'left'
             }}>
-              <Text strong>Student: </Text>
-              <Text>{formData.name}</Text>
-              <Text style={{ marginLeft: 16 }}>
-                <Text strong>Matric: </Text>
-                <Tag color="blue">{formData.matric_number || 'Not generated'}</Tag>
-              </Text>
-              <Text style={{ marginLeft: 16 }}>
-                <Text strong>Program: </Text>
-                <Tag color="purple">{formData.program_code}</Tag>
-              </Text>
+              <Row gutter={16}>
+                <Col span={12}>
+                  <div style={{ fontSize: '12px', color: '#8c8c8c', textTransform: 'uppercase', marginBottom: 4 }}>Student Name</div>
+                  <div style={{ fontWeight: 600, fontSize: '16px' }}>{formData.name}</div>
+                </Col>
+                <Col span={6}>
+                  <div style={{ fontSize: '12px', color: '#8c8c8c', textTransform: 'uppercase', marginBottom: 4 }}>Matric Number</div>
+                  <Tag color="black" style={{ margin: 0, fontWeight: 600 }}>{formData.matric_number || 'N/A'}</Tag>
+                </Col>
+                <Col span={6}>
+                  <div style={{ fontSize: '12px', color: '#8c8c8c', textTransform: 'uppercase', marginBottom: 4 }}>Program</div>
+                  <Tag style={{ margin: 0, fontWeight: 600 }}>{formData.program_code}</Tag>
+                </Col>
+              </Row>
             </div>
           )}
-          
+
           <Text type="secondary" style={{ marginBottom: 24, display: 'block' }}>
             Position student's face in the frame and click Capture Face
           </Text>
-          
-          <div style={{ 
-            height: 400, 
-            margin: '24px 0', 
-            borderRadius: 8, 
+
+          <div style={{
+            height: 400,
+            margin: '24px 0',
+            borderRadius: 8,
             overflow: 'hidden',
             backgroundColor: '#000'
           }}>
@@ -310,7 +316,7 @@ const EnrollmentPage: React.FC = () => {
               loading={loading}
             />
           </div>
-          
+
           {/* Debug button - can remove later */}
           <div style={{ marginTop: 16 }}>
             <Button
@@ -320,7 +326,7 @@ const EnrollmentPage: React.FC = () => {
                   message.error('Please fill in name first');
                   return;
                 }
-                
+
                 setLoading(true);
                 // Create a test photo for debugging
                 const testPhoto = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k=';
@@ -331,7 +337,7 @@ const EnrollmentPage: React.FC = () => {
               Test Enrollment (No Camera)
             </Button>
           </div>
-          
+
           <Space style={{ marginTop: 16 }}>
             <Button onClick={() => setCurrentStep(0)}>
               Back to Student Info
@@ -354,9 +360,9 @@ const EnrollmentPage: React.FC = () => {
               <Title level={3} style={{ marginBottom: 24 }}>
                 Enrollment Successful!
               </Title>
-              
-              <Card style={{ 
-                textAlign: 'left', 
+
+              <Card style={{
+                textAlign: 'left',
                 maxWidth: 500,
                 margin: '0 auto 32px'
               }}>
@@ -364,23 +370,23 @@ const EnrollmentPage: React.FC = () => {
                   <Text strong>Name: </Text>
                   <Text>{enrollmentResult.student?.name}</Text>
                 </div>
-                
+
                 <div style={{ marginBottom: 16 }}>
                   <Text strong>Matric Number: </Text>
                   <Tag color="blue">{enrollmentResult.student?.matric_number}</Tag>
                 </div>
-                
+
                 <div style={{ marginBottom: 16 }}>
                   <Text strong>Level: </Text>
                   <Tag color="purple">Level {enrollmentResult.student?.level}</Tag>
                 </div>
-                
+
                 <div style={{ marginBottom: 16 }}>
                   <Text strong>Program: </Text>
                   <Text>{enrollmentResult.student?.program_name}</Text>
                   <Text type="secondary"> ({enrollmentResult.student?.program_code})</Text>
                 </div>
-                
+
                 <div style={{ marginBottom: 16 }}>
                   <Text strong>Face Enrollment: </Text>
                   <Tag color={enrollmentResult.faceDetected ? "green" : "orange"}>
@@ -388,7 +394,7 @@ const EnrollmentPage: React.FC = () => {
                   </Tag>
                 </div>
               </Card>
-              
+
               <Space>
                 <Button type="primary" size="large" onClick={resetForm}>
                   Enroll Another Student
@@ -400,10 +406,10 @@ const EnrollmentPage: React.FC = () => {
             </>
           ) : (
             <>
-              <div style={{ 
-                width: 64, 
-                height: 64, 
-                borderRadius: '50%', 
+              <div style={{
+                width: 64,
+                height: 64,
+                borderRadius: '50%',
                 backgroundColor: '#ff4d4f20',
                 display: 'flex',
                 alignItems: 'center',
@@ -411,15 +417,15 @@ const EnrollmentPage: React.FC = () => {
                 margin: '0 auto 24px'
               }}>
                 <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
-                  <path d="M18 6L6 18M6 6L18 18" stroke="#ff4d4f" strokeWidth="2" strokeLinecap="round"/>
+                  <path d="M18 6L6 18M6 6L18 18" stroke="#ff4d4f" strokeWidth="2" strokeLinecap="round" />
                 </svg>
               </div>
-              
+
               <Title level={3} style={{ color: '#ff4d4f', marginBottom: 24 }}>
                 Enrollment Failed
               </Title>
-              
-              <Card style={{ 
+
+              <Card style={{
                 marginBottom: 32,
                 maxWidth: 500,
                 margin: '0 auto',
@@ -430,7 +436,7 @@ const EnrollmentPage: React.FC = () => {
                   {enrollmentResult.error || 'Unknown error occurred'}
                 </Text>
               </Card>
-              
+
               <Space>
                 <Button type="primary" onClick={() => setCurrentStep(0)}>
                   Start Over
@@ -454,28 +460,28 @@ const EnrollmentPage: React.FC = () => {
   ];
 
   return (
-    <div style={{ padding: '24px', maxWidth: 800, margin: '0 auto' }}>
-      <Card>
-        <div style={{ textAlign: 'center', marginBottom: 32 }}>
-          <div style={{ 
+    <div style={{ padding: '40px 24px', maxWidth: 1000, margin: '0 auto', minHeight: '100vh', background: 'var(--dark-bg)' }}>
+      <Card bordered={false} className="stat-card" style={{ borderRadius: 12, boxShadow: '0 8px 30px rgba(0,0,0,0.04)' }}>
+        <div style={{ textAlign: 'center', marginBottom: 48 }}>
+          <div style={{
             display: 'inline-flex',
             alignItems: 'center',
             gap: 12,
             marginBottom: 8
           }}>
-            <IdCard size={32} color="#1890ff" />
-            <Title level={3} style={{ margin: 0 }}>
+            <IdCard size={32} color="var(--primary-color)" />
+            <Title level={2} style={{ margin: 0, fontWeight: 800, letterSpacing: '-0.5px' }}>
               Student Enrollment
             </Title>
           </div>
-          <Text type="secondary">
-            AFE Babalola University - Face Recognition System
+          <Text type="secondary" style={{ fontSize: '16px' }}>
+            Register new students into the biometric identification system
           </Text>
         </div>
 
-        <Steps 
-          current={currentStep} 
-          style={{ marginBottom: 32 }}
+        <Steps
+          current={currentStep}
+          style={{ marginBottom: 48, maxWidth: 800, margin: '0 auto 48px' }}
           items={steps.map((step, index) => ({
             title: step.title,
             icon: step.icon

@@ -1,9 +1,9 @@
 // pages/AttendancePage.tsx
 import React, { useState, useEffect } from 'react';
-import { 
-  Typography, 
-  Button, 
-  message, 
+import {
+  Typography,
+  Button,
+  message,
   Progress,
   Badge,
   Space,
@@ -62,12 +62,12 @@ const AttendancePage: React.FC = () => {
       try {
         console.log('Loading face recognition models...');
         setShowCamera(false);
-        
+
         await faceRecognition.loadModels();
-        
+
         setModelsLoaded(true);
         console.log('Face models loaded successfully');
-        
+
         // Show course selection modal first
         setShowCourseModal(true);
         loadCourses();
@@ -101,7 +101,7 @@ const AttendancePage: React.FC = () => {
     try {
       setLoadingCourses(true);
       console.log('Fetching courses...');
-      
+
       const { data, error } = await supabase
         .from('courses')
         .select('id, code, title, level, semester, credit_units, is_core')
@@ -118,7 +118,7 @@ const AttendancePage: React.FC = () => {
       const coursesData = data || [];
       setCourses(coursesData);
       setFilteredCourses(coursesData);
-      
+
     } catch (error) {
       console.error('Error loading courses:', error);
       message.error('Failed to load courses');
@@ -134,13 +134,13 @@ const AttendancePage: React.FC = () => {
       setFilteredCourses(courses);
       return;
     }
-    
-    const filtered = courses.filter(course => 
+
+    const filtered = courses.filter(course =>
       course.code.toLowerCase().includes(query.toLowerCase()) ||
       course.title.toLowerCase().includes(query.toLowerCase()) ||
       course.level.toString().includes(query)
     );
-    
+
     setFilteredCourses(filtered);
   };
 
@@ -173,7 +173,7 @@ const AttendancePage: React.FC = () => {
 
     try {
       const faceDescriptor = await faceRecognition.extractFaceDescriptor(result.photoData.base64);
-      
+
       if (!faceDescriptor) {
         message.warning('No face detected');
         setTimeout(() => {
@@ -186,7 +186,7 @@ const AttendancePage: React.FC = () => {
       }
 
       const foundMatches = await faceRecognition.matchFaceForAttendance(result.photoData.base64);
-      
+
       if (foundMatches.length === 0) {
         message.warning('No matching student found');
         setTimeout(() => {
@@ -200,7 +200,7 @@ const AttendancePage: React.FC = () => {
 
       const topMatch = foundMatches[0];
       setBestMatch(topMatch);
-      
+
       if (topMatch.confidence > 0.7) {
         await autoMarkAttendance(topMatch);
       } else {
@@ -208,7 +208,7 @@ const AttendancePage: React.FC = () => {
         setLoading(false);
         setIsScanning(false);
       }
-      
+
     } catch (error: any) {
       console.error('Error:', error);
       message.error(`Error: ${error.message}`);
@@ -229,7 +229,7 @@ const AttendancePage: React.FC = () => {
       const now = new Date();
       const attendanceDate = now.toISOString().split('T')[0];
       const attendanceTime = now.toTimeString().split(' ')[0];
-      
+
       // Get selected course details
       const selectedCourseData = courses.find(c => c.code === selectedCourse);
       if (!selectedCourseData) {
@@ -308,9 +308,9 @@ const AttendancePage: React.FC = () => {
       message.success(`✅ ${match.name} marked for ${selectedCourse}`);
       setAttendanceMarked(true);
       setPresentToday(prev => prev + 1);
-      
+
       setTimeout(() => resetToCamera(), 3000);
-      
+
     } catch (error: any) {
       console.error('Error marking attendance:', error);
       message.error(`Failed to mark attendance: ${error.message}`);
@@ -355,16 +355,16 @@ const AttendancePage: React.FC = () => {
       message.error('Please select a course first');
       return;
     }
-    
+
     setShowCourseModal(false);
     setShowCamera(true);
   };
 
   return (
-    <div style={{ 
+    <div style={{
       minHeight: '100vh',
-      backgroundColor: '#0a0e17',
-      color: 'white',
+      backgroundColor: 'var(--dark-bg)',
+      color: 'var(--text-primary)',
       padding: 0,
       margin: 0,
       overflow: 'hidden'
@@ -377,261 +377,261 @@ const AttendancePage: React.FC = () => {
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
-          backgroundColor: '#0a0e17'
+          backgroundColor: 'var(--dark-bg)'
         }}>
           <div style={{ textAlign: 'center' }}>
-            <Spin size="large" style={{ marginBottom: 24, color: '#1890ff' }} />
-            <Title level={3} style={{ color: 'white', marginBottom: 16 }}>
+            <Spin size="large" style={{ marginBottom: 24, color: 'var(--primary-color)' }} />
+            <Title level={3} style={{ color: 'var(--text-primary)', marginBottom: 16 }}>
               Loading Face Recognition...
             </Title>
-            <Text style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: 14 }}>
+            <Text style={{ color: 'var(--text-secondary)', fontSize: 14 }}>
               Initializing system
             </Text>
           </div>
         </div>
       )}
 
-      
-{showCourseModal && modelsLoaded && (
-  <Modal
-    title={
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <Book size={20} />
-        <span>Select Course for Attendance</span>
-      </div>
-    }
-    open={showCourseModal}
-    onCancel={() => {
-      setShowCourseModal(false);
-      window.location.href = '/';
-    }}
-    footer={[
-      <Button 
-        key="back" 
-        onClick={() => window.location.href = '/'}
-        style={{ borderColor: 'rgba(255, 255, 255, 0.3)', color: 'white' }}
-      >
-        Cancel
-      </Button>,
-      <Button 
-        key="submit" 
-        type="primary" 
-        onClick={startScanning}
-        disabled={!selectedCourse || loadingCourses}
-        loading={loadingCourses}
-      >
-        Start Attendance
-      </Button>
-    ]}
-    centered
-    width={450}
-    styles={{
-      body: { 
-        backgroundColor: 'rgba(26, 34, 53, 0.95)',
-        padding: '24px',
-        color: 'white',
-        borderRadius: '0 0 12px 12px'
-      },
-      header: { 
-        backgroundColor: 'rgba(26, 34, 53, 0.95)',
-        borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-        color: 'white',
-        borderRadius: '12px 12px 0 0',
-        marginBottom: 0
-      },
-      footer: { 
-        backgroundColor: 'rgba(26, 34, 53, 0.95)',
-        borderTop: '1px solid rgba(255, 255, 255, 0.1)',
-        borderRadius: '0 0 12px 12px',
-        marginTop: 0
-      },
-      mask: {
-        backgroundColor: 'rgba(0, 0, 0, 0.7)'
-      }
-    }}
-    style={{
-      borderRadius: '12px',
-      overflow: 'hidden'
-    }}
-  >
-    <div style={{ marginBottom: 20 }}>
-      {/* Search Input */}
-      <div style={{ marginBottom: 16 }}>
-        <AntSearch
-          placeholder="Search courses by code or title..."
-          allowClear
-          onChange={(e) => filterCourses(e.target.value)}
-          onSearch={filterCourses}
-          style={{ marginBottom: 12 }}
-          prefix={<Search size={16} />}
-        />
-        
-        {searchQuery && (
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Text style={{ color: 'rgba(255, 255, 255, 0.6)', fontSize: 12 }}>
-              Found {filteredCourses.length} course{filteredCourses.length !== 1 ? 's' : ''}
-            </Text>
-            {filteredCourses.length === 0 && (
-              <Button 
-                type="link" 
-                size="small" 
-                onClick={() => filterCourses('')}
-                style={{ color: '#1890ff', padding: 0 }}
-              >
-                Clear search
-              </Button>
-            )}
-          </div>
-        )}
-      </div>
 
-      <Text style={{ color: 'rgba(255, 255, 255, 0.8)', marginBottom: 8, display: 'block' }}>
-        Select Course
-      </Text>
-      <Select
-        placeholder="Choose a course..."
-        style={{ width: '100%' }}
-        onChange={handleCourseSelect}
-        value={selectedCourse}
-        loading={loadingCourses}
-        showSearch
-        filterOption={false}
-        dropdownStyle={{ 
-          backgroundColor: '#1a2235',
-          border: '1px solid rgba(255, 255, 255, 0.2)',
-          maxHeight: 300
-        }}
-        dropdownRender={(menu) => (
-          <>
-            <div style={{ 
-              padding: '8px 12px', 
-              borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-              backgroundColor: '#1a2235'
-            }}>
-              <Text style={{ color: 'rgba(255, 255, 255, 0.6)', fontSize: 12 }}>
-                Showing {filteredCourses.length} of {courses.length} courses
-              </Text>
+      {showCourseModal && modelsLoaded && (
+        <Modal
+          title={
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Book size={20} />
+              <span>Select Course for Attendance</span>
             </div>
-            {menu}
-          </>
-        )}
-      >
-        {filteredCourses.length > 0 ? (
-          filteredCourses.map((course) => (
-            <Option 
-              key={course.id} 
-              value={course.code}
-              style={{ 
-                backgroundColor: '#1a2235',
-                color: 'white',
-                padding: '12px',
-                borderBottom: '1px solid rgba(255, 255, 255, 0.05)'
-              }}
+          }
+          open={showCourseModal}
+          onCancel={() => {
+            setShowCourseModal(false);
+            window.location.href = '/';
+          }}
+          footer={[
+            <Button
+              key="back"
+              onClick={() => window.location.href = '/'}
+              style={{ borderColor: 'rgba(255, 255, 255, 0.3)', color: 'white' }}
             >
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <Text strong style={{ color: 'white', fontSize: 14 }}>
-                    {course.code}
+              Cancel
+            </Button>,
+            <Button
+              key="submit"
+              type="primary"
+              onClick={startScanning}
+              disabled={!selectedCourse || loadingCourses}
+              loading={loadingCourses}
+            >
+              Start Attendance
+            </Button>
+          ]}
+          centered
+          width={450}
+          styles={{
+            body: {
+              backgroundColor: '#fff',
+              padding: '24px',
+              color: '#1a1a1a',
+              borderRadius: '0 0 8px 8px'
+            },
+            header: {
+              backgroundColor: '#fff',
+              borderBottom: '1px solid #eee',
+              color: '#1a1a1a',
+              borderRadius: '8px 8px 0 0',
+              marginBottom: 0
+            },
+            footer: {
+              backgroundColor: '#fff',
+              borderTop: '1px solid #eee',
+              borderRadius: '0 0 8px 8px',
+              marginTop: 0
+            },
+            mask: {
+              backgroundColor: 'rgba(0, 0, 0, 0.45)'
+            }
+          }}
+          style={{
+            borderRadius: '12px',
+            overflow: 'hidden'
+          }}
+        >
+          <div style={{ marginBottom: 20 }}>
+            {/* Search Input */}
+            <div style={{ marginBottom: 16 }}>
+              <AntSearch
+                placeholder="Search courses by code or title..."
+                allowClear
+                onChange={(e) => filterCourses(e.target.value)}
+                onSearch={filterCourses}
+                style={{ marginBottom: 12 }}
+                prefix={<Search size={16} />}
+              />
+
+              {searchQuery && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text style={{ color: 'rgba(255, 255, 255, 0.6)', fontSize: 12 }}>
+                    Found {filteredCourses.length} course{filteredCourses.length !== 1 ? 's' : ''}
                   </Text>
-                  <Tag 
-                    color={course.is_core ? "blue" : "purple"} 
-                    style={{ fontSize: 10, padding: '2px 6px', margin: 0 }}
-                  >
-                    {course.is_core ? "Core" : "Elective"}
-                  </Tag>
+                  {filteredCourses.length === 0 && (
+                    <Button
+                      type="link"
+                      size="small"
+                      onClick={() => filterCourses('')}
+                      style={{ color: '#1890ff', padding: 0 }}
+                    >
+                      Clear search
+                    </Button>
+                  )}
                 </div>
-                <Text style={{ 
-                  color: 'rgba(255, 255, 255, 0.7)', 
-                  fontSize: 12,
-                  marginTop: 4
+              )}
+            </div>
+
+            <Text style={{ color: 'rgba(255, 255, 255, 0.8)', marginBottom: 8, display: 'block' }}>
+              Select Course
+            </Text>
+            <Select
+              placeholder="Choose a course..."
+              style={{ width: '100%' }}
+              onChange={handleCourseSelect}
+              value={selectedCourse}
+              loading={loadingCourses}
+              showSearch
+              filterOption={false}
+              dropdownStyle={{
+                backgroundColor: '#1a2235',
+                border: '1px solid rgba(255, 255, 255, 0.2)',
+                maxHeight: 300
+              }}
+              dropdownRender={(menu) => (
+                <>
+                  <div style={{
+                    padding: '8px 12px',
+                    borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+                    backgroundColor: '#1a2235'
+                  }}>
+                    <Text style={{ color: 'rgba(255, 255, 255, 0.6)', fontSize: 12 }}>
+                      Showing {filteredCourses.length} of {courses.length} courses
+                    </Text>
+                  </div>
+                  {menu}
+                </>
+              )}
+            >
+              {filteredCourses.length > 0 ? (
+                filteredCourses.map((course) => (
+                  <Option
+                    key={course.id}
+                    value={course.code}
+                    style={{
+                      backgroundColor: '#1a2235',
+                      color: 'white',
+                      padding: '12px',
+                      borderBottom: '1px solid rgba(255, 255, 255, 0.05)'
+                    }}
+                  >
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <Text strong style={{ color: 'white', fontSize: 14 }}>
+                          {course.code}
+                        </Text>
+                        <Tag
+                          color={course.is_core ? "blue" : "purple"}
+                          style={{ fontSize: 10, padding: '2px 6px', margin: 0 }}
+                        >
+                          {course.is_core ? "Core" : "Elective"}
+                        </Tag>
+                      </div>
+                      <Text style={{
+                        color: 'rgba(255, 255, 255, 0.7)',
+                        fontSize: 12,
+                        marginTop: 4
+                      }}>
+                        {course.title}
+                      </Text>
+                      <div style={{
+                        display: 'flex',
+                        gap: 12,
+                        marginTop: 8,
+                        fontSize: 11,
+                        color: 'rgba(255, 255, 255, 0.5)'
+                      }}>
+                        <span>Level {course.level}</span>
+                        <span>Semester {course.semester}</span>
+                        <span>{course.credit_units} CU</span>
+                      </div>
+                    </div>
+                  </Option>
+                ))
+              ) : (
+                <Option disabled value="no-results">
+                  <div style={{
+                    textAlign: 'center',
+                    padding: '20px',
+                    color: 'rgba(255, 255, 255, 0.6)'
+                  }}>
+                    <Search size={24} style={{ marginBottom: 8, opacity: 0.5 }} />
+                    <div>No courses found for "{searchQuery}"</div>
+                    <Button
+                      type="link"
+                      onClick={() => filterCourses('')}
+                      style={{
+                        color: '#1890ff',
+                        marginTop: 8,
+                        fontSize: 12
+                      }}
+                    >
+                      View all courses
+                    </Button>
+                  </div>
+                </Option>
+              )}
+            </Select>
+          </div>
+
+          {selectedCourse && (
+            <div style={{
+              backgroundColor: 'rgba(24, 144, 255, 0.1)',
+              borderRadius: 8,
+              padding: 12,
+              marginTop: 16,
+              border: '1px solid rgba(24, 144, 255, 0.3)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                <div style={{
+                  width: 20,
+                  height: 20,
+                  borderRadius: '50%',
+                  backgroundColor: '#1890ff',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0
                 }}>
-                  {course.title}
-                </Text>
-                <div style={{ 
-                  display: 'flex', 
-                  gap: 12, 
-                  marginTop: 8,
-                  fontSize: 11,
-                  color: 'rgba(255, 255, 255, 0.5)'
-                }}>
-                  <span>Level {course.level}</span>
-                  <span>Semester {course.semester}</span>
-                  <span>{course.credit_units} CU</span>
+                  <CheckCircle size={12} color="white" />
+                </div>
+                <div>
+                  <Text strong style={{ color: 'rgba(255, 255, 255, 0.9)', fontSize: 13, display: 'block' }}>
+                    Selected: {selectedCourse}
+                  </Text>
+                  <Text style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: 12, marginTop: 4 }}>
+                    {courses.find(c => c.code === selectedCourse)?.title}
+                  </Text>
+
                 </div>
               </div>
-            </Option>
-          ))
-        ) : (
-          <Option disabled value="no-results">
-            <div style={{ 
-              textAlign: 'center', 
-              padding: '20px',
-              color: 'rgba(255, 255, 255, 0.6)'
-            }}>
-              <Search size={24} style={{ marginBottom: 8, opacity: 0.5 }} />
-              <div>No courses found for "{searchQuery}"</div>
-              <Button 
-                type="link" 
-                onClick={() => filterCourses('')}
-                style={{ 
-                  color: '#1890ff', 
-                  marginTop: 8,
-                  fontSize: 12 
-                }}
-              >
-                View all courses
-              </Button>
             </div>
-          </Option>
-        )}
-      </Select>
-    </div>
-
-    {selectedCourse && (
-      <div style={{ 
-        backgroundColor: 'rgba(24, 144, 255, 0.1)',
-        borderRadius: 8,
-        padding: 12,
-        marginTop: 16,
-        border: '1px solid rgba(24, 144, 255, 0.3)'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-          <div style={{ 
-            width: 20, 
-            height: 20, 
-            borderRadius: '50%', 
-            backgroundColor: '#1890ff',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexShrink: 0
-          }}>
-            <CheckCircle size={12} color="white" />
-          </div>
-          <div>
-            <Text strong style={{ color: 'rgba(255, 255, 255, 0.9)', fontSize: 13, display: 'block' }}>
-              Selected: {selectedCourse}
-            </Text>
-            <Text style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: 12, marginTop: 4 }}>
-              {courses.find(c => c.code === selectedCourse)?.title}
-            </Text>
-            
-          </div>
-        </div>
-      </div>
-    )}
-  </Modal>
-)}
+          )}
+        </Modal>
+      )}
 
       {/* Camera View */}
       {showCamera && modelsLoaded && !showCourseModal && (
-        <div style={{ 
+        <div style={{
           height: '100vh',
           display: 'flex',
           flexDirection: 'column'
         }}>
           {/* Top Bar */}
-          <div style={{ 
+          <div style={{
             padding: '12px 16px',
             backgroundColor: 'rgba(0, 0, 0, 0.9)',
             display: 'flex',
@@ -646,17 +646,17 @@ const AttendancePage: React.FC = () => {
                 type="text"
                 icon={<ArrowLeft size={18} />}
                 onClick={() => window.location.href = '/'}
-                style={{ 
+                style={{
                   color: 'white',
                   padding: '4px 8px',
                   minWidth: 'auto'
                 }}
               />
-              
+
               {/* Course Info */}
               <div style={{ maxWidth: 120 }}>
-                <Text style={{ 
-                  color: '#1890ff', 
+                <Text style={{
+                  color: '#1890ff',
                   fontSize: 12,
                   fontWeight: 'bold',
                   display: 'block',
@@ -666,8 +666,8 @@ const AttendancePage: React.FC = () => {
                 }}>
                   {selectedCourse}
                 </Text>
-                <Text style={{ 
-                  color: 'rgba(255, 255, 255, 0.7)', 
+                <Text style={{
+                  color: 'rgba(255, 255, 255, 0.7)',
                   fontSize: 10,
                   whiteSpace: 'nowrap',
                   overflow: 'hidden',
@@ -679,7 +679,7 @@ const AttendancePage: React.FC = () => {
             </div>
 
             {/* Center - Attendance Counter Square */}
-            <div style={{ 
+            <div style={{
               width: 65,
               height: 65,
               borderRadius: '8px',
@@ -691,16 +691,16 @@ const AttendancePage: React.FC = () => {
               justifyContent: 'center',
               textAlign: 'center'
             }}>
-              <Text style={{ 
-                color: '#52c41a', 
+              <Text style={{
+                color: '#52c41a',
                 fontSize: 24,
                 fontWeight: 'bold',
                 lineHeight: '26px'
               }}>
                 {presentToday}
               </Text>
-              <Text style={{ 
-                color: 'rgba(255, 255, 255, 0.6)', 
+              <Text style={{
+                color: 'rgba(255, 255, 255, 0.6)',
                 fontSize: 10,
                 marginTop: 2
               }}>
@@ -717,7 +717,7 @@ const AttendancePage: React.FC = () => {
                   onClick={toggleAutoScan}
                   icon={<StopCircle size={16} />}
                   size="small"
-                  style={{ 
+                  style={{
                     padding: '6px 16px',
                     fontSize: 12,
                     height: 'auto'
@@ -731,7 +731,7 @@ const AttendancePage: React.FC = () => {
                   onClick={toggleAutoScan}
                   icon={<Play size={16} />}
                   size="small"
-                  style={{ 
+                  style={{
                     padding: '6px 16px',
                     fontSize: 12,
                     height: 'auto'
@@ -744,7 +744,7 @@ const AttendancePage: React.FC = () => {
           </div>
 
           {/* Main Camera Area */}
-          <div style={{ 
+          <div style={{
             flex: 1,
             position: 'relative',
             backgroundColor: '#000',
@@ -753,7 +753,7 @@ const AttendancePage: React.FC = () => {
             alignItems: 'center',
             justifyContent: 'center'
           }}>
-            <div style={{ 
+            <div style={{
               width: '100%',
               height: '100%',
               position: 'relative'
@@ -765,7 +765,7 @@ const AttendancePage: React.FC = () => {
                 captureInterval={2000}
                 loading={loading}
               />
-              
+
               {/* Face Guide Square */}
               <div style={{
                 position: 'absolute',
@@ -789,8 +789,8 @@ const AttendancePage: React.FC = () => {
                     width: '100%'
                   }}>
                     <Spin size="large" style={{ color: '#1890ff' }} />
-                    <Text style={{ 
-                      color: 'white', 
+                    <Text style={{
+                      color: 'white',
                       marginTop: 16,
                       fontSize: 16,
                       fontWeight: 'bold'
@@ -799,7 +799,7 @@ const AttendancePage: React.FC = () => {
                     </Text>
                   </div>
                 )}
-                
+
                 {/* Dotted corners */}
                 <div style={{
                   position: 'absolute',
@@ -858,7 +858,7 @@ const AttendancePage: React.FC = () => {
                     {autoScanEnabled ? "SCANNING" : "READY"}
                   </Tag>
                   <Tag color="blue" style={{ margin: 0, fontSize: 11, maxWidth: 60 }}>
-                    <span style={{ 
+                    <span style={{
                       whiteSpace: 'nowrap',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
@@ -870,8 +870,8 @@ const AttendancePage: React.FC = () => {
                 </Space>
 
                 {/* Center - Instruction */}
-                <Text style={{ 
-                  color: 'rgba(255, 255, 255, 0.7)', 
+                <Text style={{
+                  color: 'rgba(255, 255, 255, 0.7)',
                   fontSize: 12,
                   fontWeight: '500',
                   maxWidth: 120,
@@ -890,112 +890,137 @@ const AttendancePage: React.FC = () => {
 
       {/* Processing/Results View */}
       {!showCamera && modelsLoaded && !showCourseModal && (
-        <div style={{ 
+        <div style={{
           height: '100vh',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          backgroundColor: '#0a0e17',
-          overflow: 'hidden'
+          backgroundColor: '#fff',
+          overflow: 'hidden',
+          padding: '24px'
         }}>
           {processing ? (
             <div style={{ textAlign: 'center' }}>
-              <div style={{ 
-                width: 160, 
-                height: 160, 
+              <div style={{
+                width: 140,
+                height: 140,
                 position: 'relative',
-                margin: '0 auto 24px'
+                margin: '0 auto 32px'
               }}>
                 <Progress
                   type="circle"
-                  percent={75}
-                  strokeColor={{
-                    '0%': '#1890ff',
-                    '100%': '#52c41a',
-                  }}
-                  size={160}
-                  strokeWidth={6}
+                  percent={100}
+                  status="active"
+                  strokeColor="#000"
+                  size={140}
+                  strokeWidth={4}
                   format={() => (
-                    <div style={{ fontSize: 28, color: '#1890ff' }}>
-                      <Camera size={32} />
+                    <div style={{ fontSize: 28, color: '#000' }}>
+                      <Camera size={40} strokeWidth={1.5} />
                     </div>
                   )}
                 />
               </div>
-              <Title level={3} style={{ color: 'white', marginBottom: 12 }}>
-                PROCESSING...
+              <Title level={2} style={{ margin: '0 0 12px 0', fontWeight: 800, letterSpacing: '-1px' }}>
+                ANALYZING_FACE
               </Title>
-              <Text style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: 14 }}>
-                Recognizing face for {selectedCourse}
+              <Text type="secondary" style={{ fontSize: '16px', letterSpacing: '1px' }}>
+                MATCHING BIOMETRIC HASH...
               </Text>
             </div>
           ) : attendanceMarked ? (
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ 
-                width: 120, 
-                height: 120, 
-                borderRadius: '50%', 
-                backgroundColor: '#52c41a',
+            <div style={{ textAlign: 'center', maxWidth: 450 }}>
+              <div style={{
+                width: 100,
+                height: 100,
+                borderRadius: '50%',
+                backgroundColor: '#000',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                margin: '0 auto 24px',
-                boxShadow: '0 0 30px rgba(82, 196, 26, 0.4)'
+                margin: '0 auto 32px',
+                boxShadow: '0 8px 24px rgba(0,0,0,0.15)'
               }}>
-                <CheckCircle size={60} color="white" />
+                <CheckCircle size={50} color="#fff" strokeWidth={1.5} />
               </div>
-              <Title level={3} style={{ color: '#52c41a', marginBottom: 8 }}>
-                SUCCESS
+              <Title level={2} style={{ margin: '0 0 8px 0', fontWeight: 900 }}>
+                ACCESS GRANTED
               </Title>
+              <div style={{ marginBottom: 32 }}>
+                <Text type="secondary" style={{ fontSize: '16px' }}>Attendance logged successfully</Text>
+              </div>
+
               {bestMatch && (
-                <>
-                  <Text style={{ color: 'rgba(255, 255, 255, 0.9)', fontSize: 18, marginBottom: 4 }}>
+                <div style={{
+                  backgroundColor: '#f8f9fa',
+                  padding: '24px',
+                  borderRadius: 16,
+                  border: '1px solid #eee',
+                  textAlign: 'left',
+                  marginBottom: 32
+                }}>
+                  <div style={{ fontSize: '12px', color: '#8c8c8c', textTransform: 'uppercase', marginBottom: 8, letterSpacing: '1px' }}>Student Profile</div>
+                  <div style={{ fontSize: '20px', fontWeight: 800, color: '#000', marginBottom: 4 }}>
                     {bestMatch.name}
-                  </Text>
-                  <Tag color="blue" style={{ fontSize: 14, padding: '6px 12px', marginBottom: 8 }}>
-                    {bestMatch.matric_number}
-                  </Tag>
-                  <div style={{ marginBottom: 16 }}>
-                    <Tag color="green" style={{ fontSize: 12, padding: '4px 8px' }}>
-                      {selectedCourse}
-                    </Tag>
                   </div>
-                </>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    <Tag color="black" style={{ borderRadius: 4, fontWeight: 600 }}>{bestMatch.matric_number}</Tag>
+                    <Tag style={{ borderRadius: 4, fontWeight: 600 }}>{selectedCourse}</Tag>
+                  </div>
+                </div>
               )}
-              <Text style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: 14 }}>
-                Returning in 3 seconds...
-              </Text>
+              <div style={{ color: '#8c8c8c', fontSize: '14px', fontWeight: 500 }}>
+                System resetting in 3 seconds...
+              </div>
             </div>
           ) : (
             <div style={{ textAlign: 'center' }}>
-              <div style={{ 
-                width: 120, 
-                height: 120, 
-                borderRadius: '50%', 
-                backgroundColor: '#ff4d4f',
+              <div style={{
+                width: 100,
+                height: 100,
+                borderRadius: '50%',
+                backgroundColor: '#fff',
+                border: '2px solid #ff4d4f',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                margin: '0 auto 24px'
+                margin: '0 auto 32px'
               }}>
-                <XCircle size={60} color="white" />
+                <XCircle size={50} color="#ff4d4f" strokeWidth={1.5} />
               </div>
-              <Title level={3} style={{ color: '#ff4d4f', marginBottom: 12 }}>
-                NO MATCH
+              <Title level={2} style={{ margin: '0 0 12px 0', fontWeight: 900 }}>
+                ID NOT FOUND
               </Title>
-              <Text style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: 14, marginBottom: 24 }}>
-                Face not recognized
+              <Text type="secondary" style={{ fontSize: '16px', display: 'block', marginBottom: 40 }}>
+                We couldn't match your face with any registered profile
               </Text>
-              <Button
-                type="primary"
-                onClick={resetToCamera}
-                style={{ 
-                  padding: '8px 24px',
-                  fontSize: 14
-                }}
-              >
-                Try Again
-              </Button>
+              <Space size="large">
+                <Button
+                  type="primary"
+                  onClick={resetToCamera}
+                  style={{
+                    height: '48px',
+                    padding: '0 32px',
+                    fontSize: '15px',
+                    background: '#000',
+                    borderColor: '#000',
+                    borderRadius: 8
+                  }}
+                >
+                  RE-TRY SCAN
+                </Button>
+                <Button
+                  onClick={() => window.location.href = '/'}
+                  style={{
+                    height: '48px',
+                    padding: '0 32px',
+                    fontSize: '15px',
+                    borderRadius: 8
+                  }}
+                >
+                  EXIT_SYSTEM
+                </Button>
+              </Space>
             </div>
           )}
         </div>

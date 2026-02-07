@@ -4,6 +4,12 @@
   "version": "0.1.0",
   "private": true,
   "homepage": "https://abuad-face-attendance.netlify.app",
+  "browser": {
+    "fs": false,
+    "path": false,
+    "crypto": false,
+    "stream": false
+  },
   "dependencies": {
     "@ant-design/icons": "^6.1.0",
     "@supabase/supabase-js": "^2.88.0",
