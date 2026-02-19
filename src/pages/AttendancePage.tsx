@@ -468,7 +468,7 @@ const AttendancePage: React.FC = () => {
 
               {searchQuery && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Text style={{ color: 'rgba(255, 255, 255, 0.6)', fontSize: 12 }}>
+                  <Text style={{ color: 'rgba(0, 0, 0, 0.45)', fontSize: 12 }}>
                     Found {filteredCourses.length} course{filteredCourses.length !== 1 ? 's' : ''}
                   </Text>
                   {filteredCourses.length === 0 && (
@@ -485,7 +485,7 @@ const AttendancePage: React.FC = () => {
               )}
             </div>
 
-            <Text style={{ color: 'rgba(255, 255, 255, 0.8)', marginBottom: 8, display: 'block' }}>
+            <Text style={{ color: 'rgba(0, 0, 0, 0.85)', marginBottom: 8, display: 'block' }}>
               Select Course
             </Text>
             <Select
@@ -497,18 +497,19 @@ const AttendancePage: React.FC = () => {
               showSearch
               filterOption={false}
               dropdownStyle={{
-                backgroundColor: '#1a2235',
-                border: '1px solid rgba(255, 255, 255, 0.2)',
+                backgroundColor: '#fff',
+                border: '1px solid #eee',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
                 maxHeight: 300
               }}
               dropdownRender={(menu) => (
                 <>
                   <div style={{
                     padding: '8px 12px',
-                    borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-                    backgroundColor: '#1a2235'
+                    borderBottom: '1px solid #eee',
+                    backgroundColor: '#fafafa'
                   }}>
-                    <Text style={{ color: 'rgba(255, 255, 255, 0.6)', fontSize: 12 }}>
+                    <Text style={{ color: 'rgba(0, 0, 0, 0.45)', fontSize: 12 }}>
                       Showing {filteredCourses.length} of {courses.length} courses
                     </Text>
                   </div>
@@ -522,15 +523,15 @@ const AttendancePage: React.FC = () => {
                     key={course.id}
                     value={course.code}
                     style={{
-                      backgroundColor: '#1a2235',
-                      color: 'white',
+                      backgroundColor: '#fff',
+                      color: 'rgba(0, 0, 0, 0.85)',
                       padding: '12px',
-                      borderBottom: '1px solid rgba(255, 255, 255, 0.05)'
+                      borderBottom: '1px solid #f0f0f0'
                     }}
                   >
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                        <Text strong style={{ color: 'white', fontSize: 14 }}>
+                        <Text strong style={{ color: 'rgba(0, 0, 0, 0.85)', fontSize: 14 }}>
                           {course.code}
                         </Text>
                         <Tag
@@ -541,7 +542,7 @@ const AttendancePage: React.FC = () => {
                         </Tag>
                       </div>
                       <Text style={{
-                        color: 'rgba(255, 255, 255, 0.7)',
+                        color: 'rgba(0, 0, 0, 0.65)',
                         fontSize: 12,
                         marginTop: 4
                       }}>
@@ -552,7 +553,7 @@ const AttendancePage: React.FC = () => {
                         gap: 12,
                         marginTop: 8,
                         fontSize: 11,
-                        color: 'rgba(255, 255, 255, 0.5)'
+                        color: 'rgba(0, 0, 0, 0.45)'
                       }}>
                         <span>Level {course.level}</span>
                         <span>Semester {course.semester}</span>
@@ -609,10 +610,10 @@ const AttendancePage: React.FC = () => {
                   <CheckCircle size={12} color="white" />
                 </div>
                 <div>
-                  <Text strong style={{ color: 'rgba(255, 255, 255, 0.9)', fontSize: 13, display: 'block' }}>
+                  <Text strong style={{ color: 'rgba(0, 0, 0, 0.85)', fontSize: 13, display: 'block' }}>
                     Selected: {selectedCourse}
                   </Text>
-                  <Text style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: 12, marginTop: 4 }}>
+                  <Text style={{ color: 'rgba(0, 0, 0, 0.65)', fontSize: 12, marginTop: 4 }}>
                     {courses.find(c => c.code === selectedCourse)?.title}
                   </Text>
 
