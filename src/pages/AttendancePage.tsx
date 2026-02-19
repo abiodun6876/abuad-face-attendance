@@ -5,7 +5,6 @@ import {
   Button,
   message,
   Progress,
-  Badge,
   Space,
   Tag,
   Spin,
@@ -468,7 +467,7 @@ const AttendancePage: React.FC = () => {
 
               {searchQuery && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Text style={{ color: 'rgba(0, 0, 0, 0.45)', fontSize: 12 }}>
+                  <Text style={{ color: 'rgba(255, 255, 255, 1)', fontSize: 12 }}>
                     Found {filteredCourses.length} course{filteredCourses.length !== 1 ? 's' : ''}
                   </Text>
                   {filteredCourses.length === 0 && (
