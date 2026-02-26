@@ -200,9 +200,10 @@ const AttendancePage: React.FC = () => {
       const topMatch = foundMatches[0];
       setBestMatch(topMatch);
 
-      if (topMatch.confidence > 0.7) {
+      if (topMatch.confidence > 0.8) {
         await autoMarkAttendance(topMatch);
       } else {
+        message.warning(`Match confidence too low: ${(topMatch.confidence * 100).toFixed(1)}%`);
         setProcessing(false);
         setLoading(false);
         setIsScanning(false);

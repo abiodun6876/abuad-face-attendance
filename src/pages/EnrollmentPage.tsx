@@ -303,7 +303,8 @@ const EnrollmentPage: React.FC = () => {
           </Text>
 
           <div style={{
-            height: 400,
+            minHeight: 400,
+            height: 480,
             margin: '24px 0',
             borderRadius: 8,
             overflow: 'hidden',

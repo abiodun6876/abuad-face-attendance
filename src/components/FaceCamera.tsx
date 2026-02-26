@@ -207,7 +207,7 @@ const FaceCamera: React.FC<FaceCameraProps> = ({
               left: 0,
               right: 0,
               textAlign: 'center',
-              zIndex: 10
+              zIndex: 100
             }}>
               <Button
                 className="hologram-btn"
